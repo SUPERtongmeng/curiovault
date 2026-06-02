@@ -1,0 +1,522 @@
+// Shared front-end shell: navigation, theme, mobile menu, and home background.
+(function () {
+  var STORAGE_KEY = 'xiao-xi-theme';
+  var NAV_ITEMS = [
+    { href: 'index.html', label: '首页', icon: 'fa-house' },
+    { href: 'music.html', label: '音乐', icon: 'fa-music' },
+    { href: 'film.html', label: '影视', icon: 'fa-film' },
+    { href: 'books.html', label: '书籍', icon: 'fa-book' },
+    { href: 'images.html', label: '图片', icon: 'fa-image' },
+    { href: 'articles.html', label: '文章', icon: 'fa-newspaper' }
+  ];
+
+  applySavedTheme();
+  renderSiteNav();
+  bindNavbar();
+  bindPageTransitions();
+  bindCards();
+  initCoverBg();
+  initHomeStats();
+  initCategoryShowcase();
+  initMusicPlayer();
+
+  function applySavedTheme() {
+    var saved = localStorage.getItem(STORAGE_KEY);
+    document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+  }
+
+  function renderSiteNav() {
+    var mount = document.getElementById('siteNav');
+    if (!mount) return;
+
+    var current = getCurrentPage();
+    var links = NAV_ITEMS.map(function (item) {
+      var active = item.href === current ? ' class="active"' : '';
+      return '<li><a href="' + item.href + '"' + active + '><i class="fa-solid ' + item.icon + '"></i> ' + item.label + '</a></li>';
+    }).join('');
+
+    mount.innerHTML = [
+      '<nav id="navbar">',
+      '<a href="index.html" class="nav-brand">Xiao Xi</a>',
+      '<ul class="nav-links" id="navbarNav">' + links + '</ul>',
+      '<div class="nav-actions">',
+      '<button class="theme-toggle" id="themeToggle" aria-label="切换主题">',
+      '<svg class="sun-and-moon" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24">',
+      '<circle class="sun" cx="12" cy="12" r="6" mask="url(#moon-mask)" fill="currentColor" />',
+      '<g class="sun-beams" stroke="currentColor">',
+      '<line x1="12" y1="1" x2="12" y2="3" />',
+      '<line x1="12" y1="21" x2="12" y2="23" />',
+      '<line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />',
+      '<line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />',
+      '<line x1="1" y1="12" x2="3" y2="12" />',
+      '<line x1="21" y1="12" x2="23" y2="12" />',
+      '<line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />',
+      '<line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />',
+      '</g>',
+      '<mask class="moon" id="moon-mask">',
+      '<rect x="0" y="0" width="100%" height="100%" fill="white" />',
+      '<circle cx="24" cy="10" r="6" fill="black" />',
+      '</mask>',
+      '</svg>',
+      '</button>',
+      '<button class="hamburger" id="menuToggle" aria-label="菜单">',
+      '<span class="hamburger-line"></span>',
+      '<span class="hamburger-line"></span>',
+      '<span class="hamburger-line"></span>',
+      '</button>',
+      '</div>',
+      '</nav>'
+    ].join('');
+  }
+
+  function bindNavbar() {
+    var navbar = document.getElementById('navbar');
+    var themeToggle = document.getElementById('themeToggle');
+    var menuToggle = document.getElementById('menuToggle');
+    var navbarNav = document.getElementById('navbarNav');
+
+    if (navbar) {
+      window.addEventListener('scroll', function () {
+        navbar.classList.toggle('scrolled', window.scrollY > 50);
+      });
+    }
+
+    if (themeToggle) {
+      themeToggle.addEventListener('click', function () {
+        var html = document.documentElement;
+        var next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem(STORAGE_KEY, next);
+      });
+    }
+
+    if (menuToggle && navbarNav) {
+      menuToggle.addEventListener('click', function () {
+        navbarNav.classList.toggle('nav-open');
+        menuToggle.classList.toggle('active');
+        document.body.classList.toggle('nav-menu-open');
+      });
+
+      navbarNav.querySelectorAll('a').forEach(function (link) {
+        link.addEventListener('click', function () {
+          navbarNav.classList.remove('nav-open');
+          menuToggle.classList.remove('active');
+          document.body.classList.remove('nav-menu-open');
+        });
+      });
+    }
+  }
+
+  function getCurrentPage() {
+    var file = window.location.pathname.split('/').pop();
+    return file || 'index.html';
+  }
+
+  function bindPageTransitions() {
+    var prefetched = {};
+    document.querySelectorAll('#navbarNav a[href$=".html"]').forEach(function (link) {
+      link.addEventListener('mouseenter', function () {
+        prefetchPage(link.href, prefetched);
+      });
+      link.addEventListener('touchstart', function () {
+        prefetchPage(link.href, prefetched);
+      }, { passive: true });
+    });
+
+    document.addEventListener('click', function (event) {
+      var link = event.target.closest('a[href]');
+      if (!link) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (link.target && link.target !== '_self') return;
+
+      var url = new URL(link.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      if (!/\.html$/.test(url.pathname)) return;
+      if (url.pathname === window.location.pathname && url.hash === window.location.hash) return;
+
+      event.preventDefault();
+      document.body.classList.add('page-leaving');
+      window.setTimeout(function () {
+        window.location.href = url.href;
+      }, 120);
+    });
+  }
+
+  function prefetchPage(href, prefetched) {
+    if (prefetched[href]) return;
+    prefetched[href] = true;
+    var link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.href = href;
+    document.head.appendChild(link);
+  }
+
+  function bindCards() {
+    document.querySelectorAll('.card').forEach(function (card) {
+      card.addEventListener('mousemove', function (event) {
+        var rect = card.getBoundingClientRect();
+        var x = ((event.clientX - rect.left) / rect.width) * 100;
+        var y = ((event.clientY - rect.top) / rect.height) * 100;
+        card.style.setProperty('--mouse-x', x + '%');
+        card.style.setProperty('--mouse-y', y + '%');
+      });
+    });
+  }
+
+  function initSharedFirestore() {
+    if (typeof firebase === 'undefined' || typeof FIREBASE_CONFIG === 'undefined') {
+      return null;
+    }
+    try {
+      if (!firebase.apps || firebase.apps.length === 0) {
+        firebase.initializeApp(FIREBASE_CONFIG);
+      }
+      return firebase.firestore();
+    } catch (error) {
+      if (!/already exists|already been created/i.test(error.message || '')) {
+        console.warn('Firebase init failed:', error);
+        return null;
+      }
+      return firebase.firestore();
+    }
+  }
+
+  function initHomeStats() {
+    var stats = document.getElementById('homeStats');
+    if (!stats) return;
+
+    var db = initSharedFirestore();
+    if (!db) return;
+
+    db.collection('items').get().then(function (snapshot) {
+      var counts = {
+        total: 0,
+        music: 0,
+        film: 0,
+        books: 0,
+        images: 0,
+        articles: 0
+      };
+
+      snapshot.forEach(function (doc) {
+        var category = (doc.data() || {}).category;
+        counts.total += 1;
+        if (category === 'movie' || category === 'tv') counts.film += 1;
+        else if (Object.prototype.hasOwnProperty.call(counts, category)) counts[category] += 1;
+      });
+
+      Object.keys(counts).forEach(function (key) {
+        var target = stats.querySelector('[data-home-count="' + key + '"]');
+        if (target) target.textContent = counts[key];
+      });
+    }).catch(function (error) {
+      console.warn('Home stats Firestore read failed:', error);
+    });
+  }
+
+  function initCategoryShowcase() {
+    var showcase = document.getElementById('categoryShowcase');
+    if (!showcase) return;
+
+    var db = initSharedFirestore();
+    if (!db) return;
+
+    db.collection('items').get().then(function (snapshot) {
+      var groups = {
+        music: { count: 0, covers: [] },
+        film: { count: 0, covers: [] },
+        books: { count: 0, covers: [] },
+        images: { count: 0, covers: [] },
+        articles: { count: 0, covers: [] }
+      };
+
+      snapshot.forEach(function (doc) {
+        var data = doc.data() || {};
+        var key = data.category === 'movie' || data.category === 'tv' ? 'film' : data.category;
+        var coverUrl = typeof data.coverUrl === 'string' ? data.coverUrl.trim() : '';
+        if (!Object.prototype.hasOwnProperty.call(groups, key)) return;
+
+        groups[key].count += 1;
+        if (coverUrl && groups[key].covers.indexOf(coverUrl) === -1 && groups[key].covers.length < 4) {
+          groups[key].covers.push(coverUrl);
+        }
+      });
+
+      Object.keys(groups).forEach(function (key) {
+        var group = groups[key];
+        var countTarget = showcase.querySelector('[data-showcase-count="' + key + '"]');
+        var card = showcase.querySelector('[data-showcase-card="' + key + '"]');
+        var stack = card ? card.querySelector('.showcase-cover-stack') : null;
+
+        if (countTarget) countTarget.textContent = group.count + ' 件收藏';
+        if (!stack) return;
+
+        stack.innerHTML = '';
+        group.covers.forEach(function (src) {
+          var img = document.createElement('img');
+          img.src = src;
+          img.alt = '';
+          img.loading = 'lazy';
+          img.decoding = 'async';
+          img.onerror = function () {
+            this.remove();
+          };
+          stack.appendChild(img);
+        });
+      });
+    }).catch(function (error) {
+      console.warn('Category showcase Firestore read failed:', error);
+    });
+  }
+
+  function initCoverBg() {
+    var container = document.getElementById('coverTilesBg');
+    var sceneWrapper = document.getElementById('sceneWrapper');
+    if (!container || !sceneWrapper) return;
+
+    var covers = [];
+    var state = null;
+    var raf = null;
+    var speedMultiplier = 0.6;
+
+    function randInt(max) { return Math.floor(Math.random() * max); }
+
+    function createCoverPicker() {
+      var recent = [];
+      var maxRecent = Math.min(covers.length - 1, 8);
+      return function () {
+        if (covers.length === 0) return '';
+        var pool = covers.filter(function (url) { return recent.indexOf(url) === -1; });
+        if (pool.length === 0) {
+          recent = [];
+          pool = covers;
+        }
+        var pick = pool[randInt(pool.length)];
+        recent.push(pick);
+        if (recent.length > maxRecent) recent.shift();
+        return pick;
+      };
+    }
+
+    function initFirestore() {
+      return initSharedFirestore();
+    }
+
+    function normalizeCoverUrls(snapshot) {
+      var seen = {};
+      var urls = [];
+      snapshot.forEach(function (doc) {
+        var data = doc.data() || {};
+        var url = typeof data.coverUrl === 'string' ? data.coverUrl.trim() : '';
+        if (!url || seen[url]) return;
+        seen[url] = true;
+        urls.push(url);
+      });
+      return urls.slice(0, 60);
+    }
+
+    function loadFirestoreCovers() {
+      var db = initFirestore();
+      if (!db) return Promise.resolve([]);
+      return db.collection('items')
+        .limit(120)
+        .get()
+        .then(normalizeCoverUrls)
+        .catch(function (error) {
+          console.warn('Cover background Firestore read failed:', error);
+          return [];
+        });
+    }
+
+    function createPreloadQueue(picker, size, tileW) {
+      var queue = [];
+      var loading = 0;
+      function loadOne() {
+        if (loading >= size) return;
+        loading += 1;
+        var src = picker();
+        if (!src) {
+          loading -= 1;
+          return;
+        }
+        var probe = new Image();
+        probe.onload = function () {
+          queue.push({ src: src, height: Math.round(tileW * probe.naturalHeight / probe.naturalWidth) || tileW });
+          loading -= 1;
+          if (queue.length < size) loadOne();
+        };
+        probe.onerror = function () {
+          queue.push({ src: src, height: tileW });
+          loading -= 1;
+          if (queue.length < size) loadOne();
+        };
+        probe.src = src;
+      }
+      for (var i = 0; i < size; i += 1) loadOne();
+      return {
+        take: function () {
+          if (queue.length > 0) {
+            var item = queue.shift();
+            if (queue.length < size) loadOne();
+            return item;
+          }
+          return { src: picker(), height: tileW };
+        }
+      };
+    }
+
+    function bootTiles() {
+      stopTiles();
+      if (covers.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+      var tileW = 180;
+      var vh = window.innerHeight;
+      var numCols = Math.floor(window.innerWidth / tileW) + 2;
+      var imgsPerCol = Math.ceil(vh / tileW) + 1;
+      var panel = document.createElement('div');
+      var colStates = [];
+      panel.className = 'cover-tiles-panel';
+
+      for (var c = 0; c < numCols; c += 1) {
+        var col = document.createElement('div');
+        var dir = c % 2 === 0 ? -1 : 1;
+        var speed = 6 + Math.random() * 12;
+        var startY = -(Math.random() * tileW * 2);
+        var picker = createCoverPicker();
+        var preloadQ = createPreloadQueue(picker, 2, tileW);
+
+        col.className = 'cover-tile-col';
+        col.style.transform = 'translateY(' + startY + 'px)';
+
+        for (var r = 0; r < imgsPerCol; r += 1) {
+          appendTile(col, preloadQ.take());
+        }
+
+        colStates.push({ el: col, y: startY, speed: speed, dir: dir, preloadQ: preloadQ });
+        panel.appendChild(col);
+      }
+
+      container.innerHTML = '';
+      container.appendChild(panel);
+      state = { cols: colStates, vh: vh, lastT: performance.now() };
+      raf = requestAnimationFrame(tick);
+    }
+
+    function appendTile(col, info, before) {
+      var img = document.createElement('img');
+      img.src = info.src;
+      img.alt = '';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.onerror = function () {
+        this.style.display = 'none';
+        this.style.height = '0';
+      };
+      if (before) col.insertBefore(img, col.firstChild);
+      else col.appendChild(img);
+    }
+
+    function stopTiles() {
+      if (raf) cancelAnimationFrame(raf);
+      raf = null;
+      state = null;
+    }
+
+    function tick(now) {
+      if (!state) return;
+      var dt = Math.min((now - state.lastT) / 1000, 0.1) * speedMultiplier;
+      state.lastT = now;
+
+      state.cols.forEach(function (cs) {
+        var children = cs.el.children;
+        if (children.length === 0) return;
+        cs.y += cs.speed * cs.dir * dt;
+
+        if (cs.dir < 0) {
+          while (children.length > 1 && cs.y + children[0].offsetHeight <= 0) {
+            cs.y += children[0].offsetHeight;
+            children[0].remove();
+          }
+          if (children.length > 0 && cs.y + children[children.length - 1].offsetTop < state.vh) {
+            appendTile(cs.el, cs.preloadQ.take());
+          }
+        } else {
+          while (children.length > 1 && cs.y + children[children.length - 1].offsetTop >= state.vh) {
+            children[children.length - 1].remove();
+          }
+          if (children.length > 0 && cs.y + children[0].offsetTop + children[0].offsetHeight > 0) {
+            var next = cs.preloadQ.take();
+            appendTile(cs.el, next, true);
+            cs.y -= next.height;
+          }
+        }
+        cs.el.style.transform = 'translateY(' + cs.y + 'px)';
+      });
+
+      raf = requestAnimationFrame(tick);
+    }
+
+    sceneWrapper.style.transform = 'scale(1)';
+    sceneWrapper.style.width = '100%';
+    sceneWrapper.style.height = '100%';
+
+    loadFirestoreCovers().then(function (remoteCovers) {
+      if (remoteCovers.length === 0) {
+        stopTiles();
+        container.innerHTML = '';
+        return;
+      }
+      covers = remoteCovers;
+      bootTiles();
+    });
+
+    var resizeTimer;
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(bootTiles, 300);
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden && raf) {
+        cancelAnimationFrame(raf);
+        raf = null;
+      } else if (state && !raf) {
+        state.lastT = performance.now();
+        raf = requestAnimationFrame(tick);
+      }
+    });
+  }
+
+  function initMusicPlayer() {
+    var playBtn = document.querySelector('.music-play');
+    var coverImg = document.querySelector('.music-cover img');
+    var cover = document.querySelector('.music-cover');
+    if (!playBtn || !coverImg || !cover) return;
+
+    var audio = new Audio();
+    audio.src = 'assets/time_machine.mp3';
+    audio.volume = 0.8;
+    audio.loop = true;
+    var playIcon = '<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M19.5 14.598c2-1.155 2-4.041 0-5.196l-9-5.196C8.5 3.05 6 4.494 6 6.804v10.392c0 2.31 2.5 3.753 4.5 2.598z" clip-rule="evenodd"/></svg>';
+    var pauseIcon = '<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M4 7a3 3 0 0 1 3-3h1a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3zm12-3a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h1a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3z" clip-rule="evenodd"/></svg>';
+    var playing = false;
+
+    playBtn.addEventListener('click', function () {
+      if (playing) {
+        audio.pause();
+        coverImg.classList.add('paused');
+        cover.classList.remove('spinning');
+        playBtn.innerHTML = playIcon;
+        playing = false;
+      } else {
+        audio.play().catch(function () {});
+        coverImg.classList.remove('paused');
+        coverImg.classList.add('spinning');
+        cover.classList.add('spinning');
+        playBtn.innerHTML = pauseIcon;
+        playing = true;
+      }
+    });
+  }
+})();

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CurioVault 管理后台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-heading">
+      <span class="topbar-brand">CurioVault</span>
+      <span class="topbar-divider"></span>
+      <span class="topbar-title">收藏管理后台</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="tb-btn" id="btnImport" type="button">
+        <i class="fa-solid fa-file-import" aria-hidden="true"></i>
+        <span>导入</span>
+      </button>
+      <button class="tb-btn" id="btnExport" type="button">
+        <i class="fa-solid fa-file-export" aria-hidden="true"></i>
+        <span>导出</span>
+      </button>
+      <button class="tb-btn tb-btn-primary" id="btnAdd" type="button">
+        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+        <span>添加作品</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <section class="dashboard-head" aria-label="管理概览">
+      <div>
+        <p class="eyebrow">Library Console</p>
+        <h1>收藏作品</h1>
+      </div>
+      <p class="dashboard-note" id="dashboardNote">UI 原型模式，数据暂未连接</p>
+    </section>
+
+    <section class="stats-strip" aria-label="收藏统计">
+      <div class="stat-total">
+        <span class="stat-label">总收藏</span>
+        <strong class="stat-value" id="statTotal">0</strong>
+      </div>
+      <div class="stat-breakdown" aria-label="分类数量">
+        <span class="stat-pill"><span>音乐</span><strong id="statMusic">0</strong></span>
+        <span class="stat-pill"><span>电影</span><strong id="statMovie">0</strong></span>
+        <span class="stat-pill"><span>电视剧</span><strong id="statTv">0</strong></span>
+        <span class="stat-pill"><span>书籍</span><strong id="statBooks">0</strong></span>
+        <span class="stat-pill"><span>图片</span><strong id="statImages">0</strong></span>
+        <span class="stat-pill"><span>文章</span><strong id="statArticles">0</strong></span>
+      </div>
+      <div class="stat-latest">
+        <span class="stat-label">最近添加</span>
+        <strong id="statLatest">-</strong>
+      </div>
+    </section>
+
+    <section class="health-panel" aria-label="连接健康">
+      <div class="health-head">
+        <div>
+          <p class="health-kicker">System Health</p>
+          <h2>连接健康</h2>
+        </div>
+        <button class="health-refresh" id="btnHealthRefresh" type="button">
+          <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+          <span>重新检查</span>
+        </button>
+      </div>
+      <div class="health-grid">
+        <article class="health-item" id="healthFirestore" data-health-state="checking">
+          <div class="health-item-top">
+            <span class="health-name">Firestore</span>
+            <span class="health-chip" id="healthFirestoreStatus"><i></i>检查中</span>
+          </div>
+          <p id="healthFirestoreMsg">正在检查数据库连接...</p>
+        </article>
+        <article class="health-item" id="healthData" data-health-state="checking">
+          <div class="health-item-top">
+            <span class="health-name">数据结构</span>
+            <span class="health-chip" id="healthDataStatus"><i></i>检查中</span>
+          </div>
+          <p id="healthDataMsg">正在检查 items 字段和分类...</p>
+        </article>
+        <article class="health-item" id="healthFrontend" data-health-state="checking">
+          <div class="health-item-top">
+            <span class="health-name">前台读取</span>
+            <span class="health-chip" id="healthFrontendStatus"><i></i>检查中</span>
+          </div>
+          <p id="healthFrontendMsg">正在检查前台页面资源...</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-toolbar">
+        <nav class="cat-tabs" id="catTabs" aria-label="收藏分类">
+          <button class="cat-tab active" type="button" data-cat="">全部</button>
+          <button class="cat-tab" type="button" data-cat="music">音乐</button>
+          <button class="cat-tab" type="button" data-cat="movie">电影</button>
+          <button class="cat-tab" type="button" data-cat="tv">电视剧</button>
+          <button class="cat-tab" type="button" data-cat="books">书籍</button>
+          <button class="cat-tab" type="button" data-cat="images">图片</button>
+          <button class="cat-tab" type="button" data-cat="articles">文章</button>
+        </nav>
+        <div class="toolbar-tools">
+          <label class="search-box" for="searchInput">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="searchInput" placeholder="搜索标题、作者、描述" autocomplete="off" />
+          </label>
+          <button class="tool-btn" id="btnToggleBulk" type="button">
+            <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+            <span>批量选择</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="bulk-bar" id="bulkBar" hidden>
+        <span class="bulk-status" id="bulkStatus">已选择 0 项</span>
+        <div class="bulk-actions">
+          <button class="bulk-btn" id="btnSelectAll" type="button">全选当前列表</button>
+          <button class="bulk-btn" id="btnClearSelection" type="button">取消选择</button>
+          <button class="bulk-btn bulk-btn-danger" id="btnBulkDelete" type="button" disabled>
+            <i class="fa-solid fa-trash" aria-hidden="true"></i>
+            <span>批量删除</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table" id="dataTable">
+          <thead>
+            <tr>
+              <th class="col-select">选择</th>
+              <th class="col-cover">封面</th>
+              <th class="col-title">标题</th>
+              <th class="col-cat">类别</th>
+              <th class="col-year">年份</th>
+              <th class="col-rating">评分</th>
+              <th class="col-time">添加时间</th>
+              <th class="col-actions">操作</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="8" class="table-empty">正在加载...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="modalOverlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <div>
+          <p class="modal-kicker">Collection Item</p>
+          <h2 id="modalTitle">添加作品</h2>
+        </div>
+        <button class="modal-close" id="modalClose" type="button" aria-label="关闭弹窗">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <form id="modalForm">
+        <input type="hidden" id="editId" />
+        <div class="form-group">
+          <label for="mCat">类别</label>
+          <select id="mCat">
+            <option value="music">音乐</option>
+            <option value="movie">电影</option>
+            <option value="tv">电视剧</option>
+            <option value="books">书籍</option>
+            <option value="images">图片</option>
+            <option value="articles">文章</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="mTitle">标题 <span class="required">*</span></label>
+          <input type="text" id="mTitle" required autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="mArtist">艺术家 / 作者 / 导演</label>
+          <input type="text" id="mArtist" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="mCover">封面图片 URL</label>
+          <input type="url" id="mCover" placeholder="https://..." />
+        </div>
+        <div class="form-group">
+          <label for="mDesc">描述</label>
+          <input type="text" id="mDesc" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="mTags">标签</label>
+          <input type="text" id="mTags" placeholder="科幻, 经典, 想重看" autocomplete="off" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="mYear">年份</label>
+            <input type="text" id="mYear" maxlength="24" placeholder="如 1889 / 19世纪 / 约1830" />
+          </div>
+          <div class="form-group">
+            <label for="mRating">评分</label>
+            <input type="number" id="mRating" min="1" max="5" value="4" inputmode="numeric" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="mLink">链接</label>
+          <input type="url" id="mLink" placeholder="https://..." />
+        </div>
+        <button type="submit" class="btn-submit">保存</button>
+      </form>
+    </div>
+  </div>
+
+  <input type="file" id="importFile" accept=".json" hidden />
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="../collection/js/firebase-config.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
