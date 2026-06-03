@@ -70,7 +70,7 @@ module.exports = async function handler(req, res) {
     }
 
     const content = extractMessageContent(payload);
-    const parsed = parseModelJson(content);
+    const parsed = await parseOrRepairModelJson(content, input, { apiKey, baseUrl, model });
     const result = normalizeModelResult(parsed, input);
     res.status(200).json(result);
   } catch (error) {
@@ -103,12 +103,23 @@ function normalizeRequest(body) {
 
 function buildSystemPrompt() {
   return [
-    '你是收藏后台元数据助手。只返回 JSON，不要解释。',
+    '你是收藏后台元数据助手。只返回一个可被 JSON.parse 解析的 JSON 对象。',
+    '禁止输出 <think>、Markdown、代码块、解释文字或 JSON 之外的任何内容。',
     '根据 category/title/artist 识别作品。artist 有值时作为强约束。',
     '同名且不确定时返回 needsMoreContext=true，并给 candidates 2-5 项；不要强行确定。',
     '不要编造；不确定字段用空字符串或空数组。',
     'description 中文 40-70 字；tags 为 3-5 个中文短标签；year 可为年份/年代/世纪。',
     '格式：{"item":{"title":"","artist":"","description":"","tags":[],"year":"","confidence":0,"needsMoreContext":false},"candidates":[],"needsMoreContext":false}'
+  ].join('\n');
+}
+
+function buildRepairPrompt(rawText, input) {
+  return [
+    '把下面模型输出修复为一个合法 JSON 对象，只返回 JSON，不要解释。',
+    '如果原文没有可靠作品信息，根据输入生成 needsMoreContext=true 的 JSON。',
+    '目标格式：{"item":{"title":"","artist":"","description":"","tags":[],"year":"","confidence":0,"needsMoreContext":false},"candidates":[],"needsMoreContext":false}',
+    '输入：' + JSON.stringify(input),
+    '原文：' + cleanString(rawText).slice(0, 2500)
   ].join('\n');
 }
 
@@ -120,6 +131,7 @@ function extractMessageContent(payload) {
 
 function parseModelJson(content) {
   let text = cleanString(content)
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
     .replace(/```$/i, '')
@@ -134,6 +146,46 @@ function parseModelJson(content) {
   }
 
   return JSON.parse(text);
+}
+
+async function parseOrRepairModelJson(content, input, options) {
+  try {
+    return parseModelJson(content);
+  } catch (error) {
+    const repaired = await repairModelJson(content, input, options);
+    return parseModelJson(repaired);
+  }
+}
+
+async function repairModelJson(content, input, options) {
+  const response = await fetch(`${options.baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${options.apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: options.model,
+      temperature: 0,
+      max_completion_tokens: 350,
+      messages: [
+        {
+          role: 'system',
+          name: 'CurioVault',
+          content: '你是 JSON 修复器。只返回合法 JSON。'
+        },
+        {
+          role: 'user',
+          name: 'Admin',
+          content: buildRepairPrompt(content, input)
+        }
+      ]
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(getMiniMaxError(payload));
+  return extractMessageContent(payload);
 }
 
 function normalizeModelResult(data, input) {
