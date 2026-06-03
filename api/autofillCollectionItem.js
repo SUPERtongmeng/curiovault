@@ -46,7 +46,7 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify({
         model,
         temperature: 0.2,
-        max_completion_tokens: 900,
+        max_completion_tokens: 450,
         messages: [
           {
             role: 'system',
@@ -103,17 +103,12 @@ function normalizeRequest(body) {
 
 function buildSystemPrompt() {
   return [
-    '你是 CurioVault 收藏后台的元数据助手。',
-    '你只返回 JSON，不要 Markdown，不要解释。',
-    '根据用户给出的 category/title/artist 推断作品信息。',
-    '如果 title 对应多个知名作品，artist 为空时不要强行确定；返回 needsMoreContext=true，并在 candidates 里给出 2-5 个可能项。',
-    '如果 artist 已提供，把它作为强约束。',
-    '不要编造不存在的信息；不确定的字段返回空字符串或空数组。',
-    'description 使用中文，40-80 字，适合收藏网站展示。',
-    'tags 返回 3-5 个中文短标签。',
-    'year 可返回年份、年代或世纪，如 "1889"、"19世纪"、"约1830"。',
-    'confidence 为 0 到 1。',
-    'JSON 格式固定为：{"item":{"title":"","artist":"","description":"","tags":[],"year":"","confidence":0,"needsMoreContext":false},"candidates":[],"needsMoreContext":false}'
+    '你是收藏后台元数据助手。只返回 JSON，不要解释。',
+    '根据 category/title/artist 识别作品。artist 有值时作为强约束。',
+    '同名且不确定时返回 needsMoreContext=true，并给 candidates 2-5 项；不要强行确定。',
+    '不要编造；不确定字段用空字符串或空数组。',
+    'description 中文 40-70 字；tags 为 3-5 个中文短标签；year 可为年份/年代/世纪。',
+    '格式：{"item":{"title":"","artist":"","description":"","tags":[],"year":"","confidence":0,"needsMoreContext":false},"candidates":[],"needsMoreContext":false}'
   ].join('\n');
 }
 
