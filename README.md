@@ -15,7 +15,7 @@ CurioVault 是一个个人收藏夹网站，用来整理自己觉得不错、也
 ```text
 admin/       后台管理界面
 collection/  前台收藏网站
-index.html   入口页，自动跳转到 collection/
+index.html   根入口首页，复用 collection/ 下的前台资源
 ```
 
 ## 数据字段
@@ -43,7 +43,7 @@ updatedAt    更新时间
 推荐入口：
 
 ```text
-collection/index.html
+index.html
 ```
 
 后台入口：

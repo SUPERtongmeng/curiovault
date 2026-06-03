@@ -2,12 +2,115 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="refresh" content="0;url=collection/" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CurioVault · 收藏夹</title>
-  <link rel="icon" type="image/png" href="collection/favicon.png" />
+  <base href="collection/" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <title>Xiao Xi · 收藏夹</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="css/common.css" />
 </head>
-<body>
-  <p>正在跳转到 <a href="collection/">收藏夹</a>...</p>
+<body class="page-home">
+  <div class="scene-wrapper" id="sceneWrapper">
+    <div class="cover-tiles-bg perspective-on" id="coverTilesBg" aria-hidden="true"></div>
+  </div>
+
+  <div id="siteNav"></div>
+
+  <main class="home-hero">
+    <p class="page-kicker">CurioVault</p>
+    <h1 class="hero-title-main">收藏夹</h1>
+    <p class="hero-sub-main">这里收集了一些我觉得不错、也值得留下来的东西。可能是一张图片、一首歌、一部电影，也可能是一篇之后还想再读的文章。</p>
+    <div class="hero-stats" id="homeStats" aria-label="收藏统计">
+      <div class="hero-total">
+        <span class="hero-total-num" data-home-count="total">0</span>
+        <span class="hero-total-label">总收藏</span>
+      </div>
+      <div class="hero-cats">
+        <a class="hero-cat" href="music.html"><span class="hero-cat-num" data-home-count="music">0</span><span class="hero-cat-label">音乐</span></a>
+        <a class="hero-cat" href="film.html"><span class="hero-cat-num" data-home-count="film">0</span><span class="hero-cat-label">影视</span></a>
+        <a class="hero-cat" href="books.html"><span class="hero-cat-num" data-home-count="books">0</span><span class="hero-cat-label">书籍</span></a>
+        <a class="hero-cat" href="images.html"><span class="hero-cat-num" data-home-count="images">0</span><span class="hero-cat-label">图片</span></a>
+        <a class="hero-cat" href="articles.html"><span class="hero-cat-num" data-home-count="articles">0</span><span class="hero-cat-label">文章</span></a>
+      </div>
+    </div>
+
+    <div class="music-card">
+      <div class="music-cover"><img src="assets/covers/time_machine.jpg" alt="" /></div>
+      <div class="music-info">
+        <span class="music-name">Time Machine</span>
+        <span class="music-artist">bluesky</span>
+      </div>
+      <div class="music-controls">
+        <button class="music-btn music-prev" aria-label="上一首">
+          <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M6 5a1 1 0 0 1 1 1v5.18l8.89-6.02A1 1 0 0 1 17.45 6v12a1 1 0 0 1-1.56.83L7 12.82V18a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Z"/></svg>
+        </button>
+        <button class="music-btn music-play" aria-label="播放">
+          <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M19.5 14.598c2-1.155 2-4.041 0-5.196l-9-5.196C8.5 3.05 6 4.494 6 6.804v10.392c0 2.31 2.5 3.753 4.5 2.598z" clip-rule="evenodd"/></svg>
+        </button>
+        <button class="music-btn music-next" aria-label="下一首">
+          <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M18 5a1 1 0 0 0-1 1v5.18L8.11 5.16A1 1 0 0 0 6.55 6v12a1 1 0 0 0 1.56.83L17 12.82V18a1 1 0 1 0 2 0V6a1 1 0 0 0-1-1Z"/></svg>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <section class="category-showcase" id="categoryShowcase" aria-labelledby="categoryShowcaseTitle">
+    <h2 id="categoryShowcaseTitle">分类展柜</h2>
+    <div class="category-showcase-grid">
+      <a class="category-showcase-card showcase-music" href="music.html" data-showcase-card="music">
+        <div class="showcase-cover-stack" aria-hidden="true"></div>
+        <div class="showcase-card-content">
+          <span class="showcase-icon"><i class="fa-solid fa-music"></i></span>
+          <strong>音乐</strong>
+          <span class="showcase-count" data-showcase-count="music">0 件收藏</span>
+          <p>最近循环的旋律</p>
+        </div>
+      </a>
+      <a class="category-showcase-card showcase-film" href="film.html" data-showcase-card="film">
+        <div class="showcase-cover-stack" aria-hidden="true"></div>
+        <div class="showcase-card-content">
+          <span class="showcase-icon"><i class="fa-solid fa-film"></i></span>
+          <strong>影视</strong>
+          <span class="showcase-count" data-showcase-count="film">0 件收藏</span>
+          <p>想再看一遍的影像</p>
+        </div>
+      </a>
+      <a class="category-showcase-card showcase-books" href="books.html" data-showcase-card="books">
+        <div class="showcase-cover-stack" aria-hidden="true"></div>
+        <div class="showcase-card-content">
+          <span class="showcase-icon"><i class="fa-solid fa-book-open"></i></span>
+          <strong>书籍</strong>
+          <span class="showcase-count" data-showcase-count="books">0 件收藏</span>
+          <p>值得反复翻阅的字句</p>
+        </div>
+      </a>
+      <a class="category-showcase-card showcase-images" href="images.html" data-showcase-card="images">
+        <div class="showcase-cover-stack" aria-hidden="true"></div>
+        <div class="showcase-card-content">
+          <span class="showcase-icon"><i class="fa-regular fa-image"></i></span>
+          <strong>图片</strong>
+          <span class="showcase-count" data-showcase-count="images">0 件收藏</span>
+          <p>定格过的美好瞬间</p>
+        </div>
+      </a>
+      <a class="category-showcase-card showcase-articles" href="articles.html" data-showcase-card="articles">
+        <div class="showcase-cover-stack" aria-hidden="true"></div>
+        <div class="showcase-card-content">
+          <span class="showcase-icon"><i class="fa-regular fa-file-lines"></i></span>
+          <strong>文章</strong>
+          <span class="showcase-count" data-showcase-count="articles">0 件收藏</span>
+          <p>收藏过的思想碎片</p>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/common.js"></script>
 </body>
 </html>
