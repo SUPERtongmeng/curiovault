@@ -23,6 +23,7 @@ module.exports = async function handler(req, res) {
 
   const apiKey = process.env.MINIMAX_API_KEY;
   const model = process.env.MINIMAX_MODEL || 'MiniMax-M2.7';
+  const baseUrl = normalizeBaseUrl(process.env.MINIMAX_BASE_URL || 'https://api.minimaxi.com/v1');
 
   if (!apiKey) {
     res.status(500).json({ error: 'MINIMAX_API_KEY is not configured.' });
@@ -36,7 +37,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const response = await fetch('https://api.minimax.io/v1/chat/completions', {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -189,6 +190,10 @@ function clampConfidence(value) {
 function cleanString(value) {
   if (value === null || value === undefined) return '';
   return String(value).trim();
+}
+
+function normalizeBaseUrl(value) {
+  return cleanString(value).replace(/\/+$/, '');
 }
 
 function getMiniMaxError(payload) {
