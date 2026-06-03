@@ -40,6 +40,10 @@ var healthFrontendStatus = document.getElementById('healthFrontendStatus');
 var healthFirestoreMsg = document.getElementById('healthFirestoreMsg');
 var healthDataMsg = document.getElementById('healthDataMsg');
 var healthFrontendMsg = document.getElementById('healthFrontendMsg');
+var btnAutofill = document.getElementById('btnAutofill');
+var autofillStatus = document.getElementById('autofillStatus');
+var autofillPanel = document.getElementById('autofillPanel');
+var autofillCandidates = [];
 
 document.querySelectorAll('.cat-tab').forEach(function (tab) {
   tab.addEventListener('click', function () {
@@ -95,6 +99,10 @@ if (btnHealthRefresh) {
   btnHealthRefresh.addEventListener('click', runHealthCheck);
 }
 
+if (btnAutofill) {
+  btnAutofill.addEventListener('click', handleAutofill);
+}
+
 document.getElementById('btnAdd').addEventListener('click', function () {
   editingId = null;
   modalTitle.textContent = '添加作品';
@@ -103,6 +111,7 @@ document.getElementById('btnAdd').addEventListener('click', function () {
   modalForm.reset();
   document.getElementById('mCat').value = currentCat || 'music';
   document.getElementById('mRating').value = '4';
+  resetAutofillUi();
   openModal();
 });
 
@@ -358,6 +367,11 @@ function normalizeYear(value) {
   return year || null;
 }
 
+function cleanString(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
 function openModal() {
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
@@ -386,7 +400,212 @@ function editItem(id) {
   document.getElementById('mRating').value = item.rating || 4;
   submitBtn.textContent = '保存到 Firestore';
   submitBtn.disabled = false;
+  resetAutofillUi();
   openModal();
+}
+
+function handleAutofill() {
+  var title = document.getElementById('mTitle').value.trim();
+  var artist = document.getElementById('mArtist').value.trim();
+  var category = document.getElementById('mCat').value;
+
+  if (!title) {
+    setAutofillStatus('warn', '先输入标题，再进行智能填充。');
+    document.getElementById('mTitle').focus();
+    return;
+  }
+
+  var endpoint = getAutofillEndpoint();
+  if (!endpoint) {
+    setAutofillStatus('error', '未配置智能填充接口。请先填写 Vercel API 地址。');
+    return;
+  }
+
+  if (endpoint.indexOf('your-vercel-project') !== -1) {
+    setAutofillStatus('error', '请先把 Vercel API 地址替换到 firebase-config.js。');
+    return;
+  }
+
+  setAutofillLoading(true);
+  setAutofillStatus('', artist ? '正在用标题和作者/导演信息查询...' : '正在用标题查询...');
+  hideAutofillPanel();
+
+  fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      category: category,
+      title: title,
+      artist: artist,
+      current: {
+        description: document.getElementById('mDesc').value.trim(),
+        tags: parseTags(document.getElementById('mTags').value),
+        year: document.getElementById('mYear').value.trim()
+      }
+    })
+  })
+    .then(function (response) {
+      return response.json().catch(function () {
+        return {};
+      }).then(function (data) {
+        if (!response.ok) {
+          throw new Error(data.error || data.message || '智能填充请求失败');
+        }
+        return data;
+      });
+    })
+    .then(function (data) {
+      handleAutofillResult(data);
+    })
+    .catch(function (error) {
+      setAutofillStatus('error', '填充失败：' + getErrorMessage(error));
+    })
+    .finally(function () {
+      setAutofillLoading(false);
+    });
+}
+
+function handleAutofillResult(data) {
+  var result = normalizeAutofillItem(data.item || data.result || data);
+  var candidates = normalizeAutofillCandidates(data.candidates || result.candidates);
+  var confidence = typeof result.confidence === 'number' ? result.confidence : 0;
+  var needsMoreContext = Boolean(data.needsMoreContext || result.needsMoreContext);
+
+  if (candidates.length > 1 || (needsMoreContext && candidates.length > 0)) {
+    renderAutofillCandidates(candidates);
+    setAutofillStatus('warn', '找到多个可能结果。请选择一个，或补充作者/导演后再试。');
+    return;
+  }
+
+  if (needsMoreContext && !hasUsefulAutofillData(result)) {
+    setAutofillStatus('warn', '暂时无法确认具体作品。可以补充作者/导演后再点一次。');
+    return;
+  }
+
+  if (!hasUsefulAutofillData(result)) {
+    setAutofillStatus('warn', '没有找到足够可靠的信息。可以补充作者/导演后再试。');
+    return;
+  }
+
+  applyAutofillData(result);
+  if (confidence && confidence < 0.65) {
+    setAutofillStatus('warn', '已填充可用信息，但匹配度偏低，建议确认后再保存。');
+    return;
+  }
+  setAutofillStatus('ok', '已填充空字段。已填写的内容不会被覆盖。');
+}
+
+function normalizeAutofillItem(item) {
+  item = item || {};
+  return {
+    title: cleanString(item.title),
+    artist: cleanString(item.artist || item.creator || item.author || item.director),
+    description: cleanString(item.description),
+    tags: normalizeTags(item.tags),
+    year: normalizeYear(item.year),
+    confidence: Number(item.confidence) || 0,
+    needsMoreContext: Boolean(item.needsMoreContext),
+    candidates: item.candidates
+  };
+}
+
+function normalizeAutofillCandidates(candidates) {
+  if (!Array.isArray(candidates)) return [];
+  return candidates.map(normalizeAutofillItem).filter(function (item) {
+    return item.title || item.artist || item.description || item.year || item.tags.length;
+  }).slice(0, 5);
+}
+
+function hasUsefulAutofillData(item) {
+  return Boolean(item.artist || item.description || item.year || item.tags.length);
+}
+
+function renderAutofillCandidates(candidates) {
+  autofillCandidates = candidates;
+  if (!autofillPanel) return;
+
+  autofillPanel.hidden = false;
+  autofillPanel.innerHTML = [
+    '<p class="autofill-panel-title">请选择更接近的结果</p>',
+    candidates.map(function (item, index) {
+      var title = item.title || document.getElementById('mTitle').value.trim();
+      var meta = [
+        item.artist,
+        item.year,
+        normalizeTags(item.tags).join(' / ')
+      ].filter(Boolean).join(' · ');
+
+      return [
+        '<div class="autofill-candidate">',
+        '<div><strong>' + esc(title) + '</strong><span>' + esc(meta || item.description || '暂无补充信息') + '</span></div>',
+        '<button class="autofill-apply" type="button" data-autofill-index="' + index + '">应用</button>',
+        '</div>'
+      ].join('');
+    }).join('')
+  ].join('');
+
+  autofillPanel.querySelectorAll('[data-autofill-index]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var item = autofillCandidates[parseInt(button.dataset.autofillIndex, 10)];
+      applyAutofillData(item);
+      hideAutofillPanel();
+      setAutofillStatus('ok', '已应用候选信息。已填写的内容不会被覆盖。');
+    });
+  });
+}
+
+function applyAutofillData(item) {
+  fillEmptyField('mArtist', item.artist);
+  fillEmptyField('mDesc', item.description);
+  fillEmptyField('mYear', item.year);
+
+  var tags = normalizeTags(item.tags);
+  if (tags.length && !document.getElementById('mTags').value.trim()) {
+    document.getElementById('mTags').value = tags.join(', ');
+  }
+}
+
+function fillEmptyField(id, value) {
+  var input = document.getElementById(id);
+  if (!input || !value || input.value.trim()) return;
+  input.value = value;
+}
+
+function getAutofillEndpoint() {
+  if (typeof CURIOVAULT_AUTOFILL_ENDPOINT !== 'undefined' && CURIOVAULT_AUTOFILL_ENDPOINT) {
+    return CURIOVAULT_AUTOFILL_ENDPOINT;
+  }
+  if (window.location.hostname.indexOf('vercel.app') !== -1) {
+    return '/api/autofillCollectionItem';
+  }
+  return '';
+}
+
+function setAutofillLoading(isLoading) {
+  if (!btnAutofill) return;
+  btnAutofill.disabled = isLoading;
+  btnAutofill.innerHTML = isLoading
+    ? '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><span>查询中</span>'
+    : '<i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>一键填充</span>';
+}
+
+function setAutofillStatus(type, message) {
+  if (!autofillStatus) return;
+  autofillStatus.className = 'autofill-status' + (type ? ' is-' + type : '');
+  autofillStatus.textContent = message;
+}
+
+function resetAutofillUi() {
+  autofillCandidates = [];
+  hideAutofillPanel();
+  setAutofillLoading(false);
+  setAutofillStatus('', '输入标题后可自动识别作者、描述、标签和年份。');
+}
+
+function hideAutofillPanel() {
+  if (!autofillPanel) return;
+  autofillPanel.hidden = true;
+  autofillPanel.innerHTML = '';
 }
 
 function deleteItem(id) {

@@ -814,6 +814,8 @@ body.bulk-mode .data-table td[data-label="选择"] {
   border: 1px solid rgba(237, 146, 15, 0.18);
   border-radius: 8px;
   background: rgba(237, 146, 15, 0.11);
+  font-size: 1.45rem;
+  line-height: 1;
 }
 
 .td-title {
@@ -964,8 +966,8 @@ body.bulk-mode .data-table td[data-label="选择"] {
 }
 
 .modal {
-  width: min(520px, 100%);
-  max-height: min(86vh, 760px);
+  width: min(760px, 100%);
+  max-height: min(90vh, 700px);
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -981,7 +983,7 @@ body.bulk-mode .data-table td[data-label="选择"] {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 22px 24px 16px;
+  padding: 16px 22px 12px;
   border-bottom: 1px solid var(--border);
   background: rgba(18, 18, 25, 0.96);
 }
@@ -989,7 +991,7 @@ body.bulk-mode .data-table td[data-label="选择"] {
 .modal-header h2 {
   margin-top: 2px;
   color: #fff;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 700;
 }
 
@@ -997,8 +999,8 @@ body.bulk-mode .data-table td[data-label="选择"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
@@ -1014,16 +1016,19 @@ body.bulk-mode .data-table td[data-label="选择"] {
 }
 
 form {
-  padding: 20px 24px 24px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+  padding: 16px 22px 18px;
 }
 
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 0;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   color: var(--text-soft);
   font-size: 0.8rem;
   font-weight: 600;
@@ -1036,8 +1041,8 @@ form {
 .form-group input,
 .form-group select {
   width: 100%;
-  min-height: 40px;
-  padding: 9px 12px;
+  min-height: 36px;
+  padding: 7px 11px;
   border: 1px solid var(--border);
   border-radius: 8px;
   outline: none;
@@ -1072,10 +1077,146 @@ form {
   box-shadow: 0 0 0 3px rgba(237, 146, 15, 0.12);
 }
 
+.autofill-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.btn-autofill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid rgba(237, 146, 15, 0.32);
+  border-radius: 8px;
+  background: rgba(237, 146, 15, 0.1);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.btn-autofill:hover {
+  color: #fff;
+  background: rgba(237, 146, 15, 0.16);
+  border-color: rgba(237, 146, 15, 0.48);
+}
+
+.btn-autofill:active {
+  transform: translateY(1px);
+}
+
+.btn-autofill:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.autofill-status {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.autofill-status.is-ok {
+  color: #8ee0ad;
+}
+
+.autofill-status.is-warn {
+  color: var(--accent);
+}
+
+.autofill-status.is-error {
+  color: var(--danger);
+}
+
+.autofill-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(237, 146, 15, 0.18);
+  border-radius: 8px;
+  background: rgba(237, 146, 15, 0.06);
+}
+
+.autofill-panel[hidden] {
+  display: none;
+}
+
+.autofill-panel-title {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.autofill-candidate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.autofill-candidate strong {
+  display: block;
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autofill-candidate span {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autofill-apply {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid rgba(237, 146, 15, 0.28);
+  border-radius: 8px;
+  background: rgba(237, 146, 15, 0.1);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.autofill-apply:hover {
+  color: #fff;
+  background: rgba(237, 146, 15, 0.16);
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 14px;
+  grid-column: 1 / -1;
+}
+
+.form-cat,
+.form-cover,
+.form-desc,
+.form-tags,
+.form-link,
+.btn-submit {
+  grid-column: 1 / -1;
 }
 
 .btn-submit {
@@ -1083,8 +1224,8 @@ form {
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 42px;
-  margin-top: 4px;
+  min-height: 38px;
+  margin-top: 2px;
   border: 1px solid var(--accent);
   border-radius: 8px;
   background: var(--accent);
@@ -1419,8 +1560,25 @@ form {
     padding-right: 18px;
   }
 
+  form {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
   .form-row {
     grid-template-columns: 1fr;
-    gap: 0;
+    gap: 12px;
+  }
+
+  .autofill-title-row {
+    grid-template-columns: 1fr;
+  }
+
+  .btn-autofill {
+    width: 100%;
+  }
+
+  .autofill-candidate {
+    grid-template-columns: 1fr;
   }
 }

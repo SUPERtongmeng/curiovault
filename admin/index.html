@@ -167,7 +167,7 @@
       </div>
       <form id="modalForm">
         <input type="hidden" id="editId" />
-        <div class="form-group">
+        <div class="form-group form-cat">
           <label for="mCat">类别</label>
           <select id="mCat">
             <option value="music">音乐</option>
@@ -178,23 +178,31 @@
             <option value="articles">文章</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group form-title">
           <label for="mTitle">标题 <span class="required">*</span></label>
-          <input type="text" id="mTitle" required autocomplete="off" />
+          <div class="autofill-title-row">
+            <input type="text" id="mTitle" required autocomplete="off" />
+            <button class="btn-autofill" id="btnAutofill" type="button">
+              <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+              <span>一键填充</span>
+            </button>
+          </div>
+          <p class="autofill-status" id="autofillStatus" aria-live="polite">输入标题后可自动识别作者、描述、标签和年份。</p>
         </div>
-        <div class="form-group">
+        <div class="form-group form-artist">
           <label for="mArtist">艺术家 / 作者 / 导演</label>
           <input type="text" id="mArtist" autocomplete="off" />
         </div>
-        <div class="form-group">
+        <div class="autofill-panel" id="autofillPanel" hidden></div>
+        <div class="form-group form-cover">
           <label for="mCover">封面图片 URL</label>
           <input type="url" id="mCover" placeholder="https://..." />
         </div>
-        <div class="form-group">
+        <div class="form-group form-desc">
           <label for="mDesc">描述</label>
           <input type="text" id="mDesc" autocomplete="off" />
         </div>
-        <div class="form-group">
+        <div class="form-group form-tags">
           <label for="mTags">标签</label>
           <input type="text" id="mTags" placeholder="科幻, 经典, 想重看" autocomplete="off" />
         </div>
@@ -208,7 +216,7 @@
             <input type="number" id="mRating" min="1" max="5" value="4" inputmode="numeric" />
           </div>
         </div>
-        <div class="form-group">
+        <div class="form-group form-link">
           <label for="mLink">链接</label>
           <input type="url" id="mLink" placeholder="https://..." />
         </div>

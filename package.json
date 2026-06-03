@@ -1,0 +1,8 @@
+{
+  "name": "curiovault",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "check": "node --check admin/js/admin.js && node --check api/autofillCollectionItem.js && node --check functions/index.js"
+  }
+}

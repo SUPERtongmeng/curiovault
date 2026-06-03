@@ -6,3 +6,5 @@ var FIREBASE_CONFIG = {
   messagingSenderId: '132635629489',
   appId: '1:132635629489:web:be18fc9934fe4a38174f90'
 };
+
+var CURIOVAULT_AUTOFILL_ENDPOINT = 'https://curiovault-theta.vercel.app/api/autofillCollectionItem';
