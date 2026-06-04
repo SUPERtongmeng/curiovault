@@ -1166,7 +1166,23 @@ form {
   background: rgba(255, 255, 255, 0.035);
 }
 
+.autofill-title-suggestion {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
 .autofill-candidate strong {
+  display: block;
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autofill-title-suggestion strong {
   display: block;
   overflow: hidden;
   color: #fff;
@@ -1183,6 +1199,13 @@ form {
   font-size: 0.74rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.autofill-title-suggestion span {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 0.74rem;
 }
 
 .autofill-apply {
@@ -1579,6 +1602,10 @@ form {
   }
 
   .autofill-candidate {
+    grid-template-columns: 1fr;
+  }
+
+  .autofill-title-suggestion {
     grid-template-columns: 1fr;
   }
 }

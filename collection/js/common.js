@@ -237,7 +237,7 @@
         if (!Object.prototype.hasOwnProperty.call(groups, key)) return;
 
         groups[key].count += 1;
-        if (coverUrl && groups[key].covers.indexOf(coverUrl) === -1 && groups[key].covers.length < 4) {
+        if (coverUrl && groups[key].covers.indexOf(coverUrl) === -1) {
           groups[key].covers.push(coverUrl);
         }
       });
@@ -252,12 +252,19 @@
         if (!stack) return;
 
         stack.innerHTML = '';
-        group.covers.forEach(function (src) {
+        pickShowcaseCovers(group.covers, key).forEach(function (src, index) {
           var img = document.createElement('img');
+          var placement = getShowcaseCoverPlacement(key, index);
           img.src = src;
           img.alt = '';
           img.loading = 'lazy';
           img.decoding = 'async';
+          img.style.setProperty('--cover-left', placement.left + 'px');
+          img.style.setProperty('--cover-top', placement.top + 'px');
+          img.style.setProperty('--cover-rotate', placement.rotate + 'deg');
+          img.style.setProperty('--cover-hover-x', placement.hoverX + 'px');
+          img.style.setProperty('--cover-hover-y', placement.hoverY + 'px');
+          img.style.setProperty('--cover-hover-rotate', placement.hoverRotate + 'deg');
           img.onerror = function () {
             this.remove();
           };
@@ -267,6 +274,59 @@
     }).catch(function (error) {
       console.warn('Category showcase Firestore read failed:', error);
     });
+  }
+
+  function pickShowcaseCovers(covers, groupKey) {
+    if (!covers.length) return [];
+    return covers
+      .map(function (src) {
+        return { src: src, score: hashString(groupKey + ':' + src + ':' + getShowcaseSeed()) };
+      })
+      .sort(function (a, b) {
+        return a.score - b.score;
+      })
+      .slice(0, 4)
+      .map(function (item) {
+        return item.src;
+      });
+  }
+
+  function getShowcaseSeed() {
+    var now = new Date();
+    return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  }
+
+  function getShowcaseCoverPlacement(groupKey, index) {
+    var seed = hashString(groupKey + ':' + index);
+    var base = [
+      { left: 10, top: 12, rotate: -9, hoverX: -4, hoverY: -3, hoverRotate: -11 },
+      { left: 43, top: 2, rotate: 4, hoverX: 0, hoverY: -6, hoverRotate: 6 },
+      { left: 72, top: 12, rotate: 11, hoverX: 5, hoverY: -3, hoverRotate: 13 },
+      { left: 58, top: 14, rotate: -3, hoverX: 2, hoverY: 4, hoverRotate: -5 }
+    ][index] || { left: 36, top: 10, rotate: 0, hoverX: 0, hoverY: -3, hoverRotate: 0 };
+
+    return {
+      left: base.left + seededRange(seed, -4, 5),
+      top: base.top + seededRange(seed >> 3, -4, 4),
+      rotate: base.rotate + seededRange(seed >> 6, -3, 3),
+      hoverX: base.hoverX + seededRange(seed >> 9, -2, 2),
+      hoverY: base.hoverY + seededRange(seed >> 12, -2, 2),
+      hoverRotate: base.hoverRotate + seededRange(seed >> 15, -3, 3)
+    };
+  }
+
+  function hashString(value) {
+    var hash = 2166136261;
+    for (var i = 0; i < value.length; i += 1) {
+      hash ^= value.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function seededRange(seed, min, max) {
+    var value = Math.abs(Math.sin(seed || 1) * 10000);
+    return Math.floor((value - Math.floor(value)) * (max - min + 1)) + min;
   }
 
   function initCoverBg() {

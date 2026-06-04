@@ -224,8 +224,7 @@ function initFirestore() {
 
 function loadItems() {
   if (!db) {
-    renderLoadError('Firestore 尚未连接');
-    return Promise.resolve();
+    return loadItemsFromRest('Firebase SDK 不可用，正在使用 REST 兜底读取...');
   }
 
   tableBody.innerHTML = '<tr><td colspan="8" class="table-empty">正在从 Firestore 加载...</td></tr>';
@@ -244,7 +243,49 @@ function loadItems() {
       renderTable();
     })
     .catch(function (error) {
-      renderLoadError('读取 Firestore 失败：' + getErrorMessage(error));
+      return loadItemsFromRest('SDK 读取失败，正在使用 REST 兜底读取...', error);
+    });
+}
+
+function loadItemsFromRest(message, sdkError) {
+  var restUrl = getFirestoreRestUrl();
+  if (!restUrl) {
+    renderLoadError(sdkError
+      ? '读取 Firestore 失败：' + getErrorMessage(sdkError)
+      : 'Firebase 配置未加载，无法读取数据');
+    return Promise.resolve();
+  }
+
+  tableBody.innerHTML = '<tr><td colspan="8" class="table-empty">正在从 Firestore REST 加载...</td></tr>';
+  dashboardNote.textContent = message;
+
+  return fetch(restUrl)
+    .then(function (response) {
+      return response.json().catch(function () {
+        return {};
+      }).then(function (data) {
+        if (!response.ok) {
+          throw new Error(getRestErrorMessage(data) || 'REST 读取失败');
+        }
+        return data;
+      });
+    })
+    .then(function (data) {
+      allItems = (data.documents || []).map(normalizeRestDoc).filter(function (item) {
+        return CATEGORIES.indexOf(item.category) !== -1;
+      }).sort(function (a, b) {
+        return (timestampToDate(b.createdAt) || new Date(0)) - (timestampToDate(a.createdAt) || new Date(0));
+      });
+      selectedIds = [];
+      dashboardNote.textContent = sdkError
+        ? '已通过 REST 兜底读取 items；保存和删除仍需要 Firebase SDK 正常加载'
+        : '已通过 REST 读取 items';
+      renderTable();
+    })
+    .catch(function (error) {
+      renderLoadError(sdkError
+        ? 'SDK 读取失败：' + getErrorMessage(sdkError) + '；REST 兜底也失败：' + getErrorMessage(error)
+        : 'REST 读取失败：' + getErrorMessage(error));
     });
 }
 
@@ -313,6 +354,66 @@ function normalizeDoc(doc) {
     createdAt: data.createdAt || null,
     updatedAt: data.updatedAt || null
   };
+}
+
+function normalizeRestDoc(doc) {
+  var data = decodeRestFields(doc.fields || {});
+  return {
+    id: getRestDocId(doc.name),
+    category: data.category || '',
+    title: data.title || '',
+    artist: data.artist || '',
+    coverUrl: data.coverUrl || '',
+    description: data.description || '',
+    link: data.link || '',
+    year: data.year || null,
+    rating: data.rating || 4,
+    tags: normalizeTags(data.tags),
+    createdAt: data.createdAt || null,
+    updatedAt: data.updatedAt || null
+  };
+}
+
+function decodeRestFields(fields) {
+  var output = {};
+  Object.keys(fields).forEach(function (key) {
+    output[key] = decodeRestValue(fields[key]);
+  });
+  return output;
+}
+
+function decodeRestValue(value) {
+  if (!value) return null;
+  if (Object.prototype.hasOwnProperty.call(value, 'stringValue')) return value.stringValue;
+  if (Object.prototype.hasOwnProperty.call(value, 'integerValue')) return Number(value.integerValue);
+  if (Object.prototype.hasOwnProperty.call(value, 'doubleValue')) return Number(value.doubleValue);
+  if (Object.prototype.hasOwnProperty.call(value, 'booleanValue')) return Boolean(value.booleanValue);
+  if (Object.prototype.hasOwnProperty.call(value, 'timestampValue')) return value.timestampValue;
+  if (value.arrayValue) {
+    return (value.arrayValue.values || []).map(decodeRestValue);
+  }
+  if (value.mapValue) return decodeRestFields(value.mapValue.fields || {});
+  return null;
+}
+
+function getRestDocId(name) {
+  var parts = String(name || '').split('/');
+  return parts[parts.length - 1] || '';
+}
+
+function getFirestoreRestUrl() {
+  if (typeof FIREBASE_CONFIG === 'undefined' || !FIREBASE_CONFIG.projectId || !FIREBASE_CONFIG.apiKey) {
+    return '';
+  }
+  return 'https://firestore.googleapis.com/v1/projects/'
+    + encodeURIComponent(FIREBASE_CONFIG.projectId)
+    + '/databases/(default)/documents/items?key='
+    + encodeURIComponent(FIREBASE_CONFIG.apiKey);
+}
+
+function getRestErrorMessage(data) {
+  if (data && data.error && data.error.message) return data.error.message;
+  return '';
 }
 
 function renderLoadError(message) {
@@ -470,6 +571,7 @@ function handleAutofillResult(data) {
   var candidates = normalizeAutofillCandidates(data.candidates || result.candidates);
   var confidence = typeof result.confidence === 'number' ? result.confidence : 0;
   var needsMoreContext = Boolean(data.needsMoreContext || result.needsMoreContext);
+  var hasTitleSuggestion = getSuggestedTitle(result) !== '';
 
   if (candidates.length > 1 || (needsMoreContext && candidates.length > 0)) {
     renderAutofillCandidates(candidates);
@@ -477,22 +579,29 @@ function handleAutofillResult(data) {
     return;
   }
 
-  if (needsMoreContext && !hasUsefulAutofillData(result)) {
+  if (needsMoreContext && !hasUsefulAutofillData(result) && !hasTitleSuggestion) {
     setAutofillStatus('warn', '暂时无法确认具体作品。可以补充作者/导演后再点一次。');
     return;
   }
 
-  if (!hasUsefulAutofillData(result)) {
+  if (!hasUsefulAutofillData(result) && !hasTitleSuggestion) {
     setAutofillStatus('warn', '没有找到足够可靠的信息。可以补充作者/导演后再试。');
     return;
   }
 
   applyAutofillData(result);
-  if (confidence && confidence < 0.65) {
-    setAutofillStatus('warn', '已填充可用信息，但匹配度偏低，建议确认后再保存。');
+  renderAutofillTitleSuggestion(result);
+
+  var titleNote = hasTitleSuggestion ? '，并生成了可应用的建议标题' : '';
+  if (needsMoreContext) {
+    setAutofillStatus('warn', '已填充可用信息' + titleNote + '，但结果仍需确认。可以补充作者/导演后再试。');
     return;
   }
-  setAutofillStatus('ok', '已填充空字段。已填写的内容不会被覆盖。');
+  if (confidence && confidence < 0.65) {
+    setAutofillStatus('warn', '已填充可用信息' + titleNote + '，但匹配度偏低，建议确认后再保存。');
+    return;
+  }
+  setAutofillStatus('ok', '已填充空字段' + titleNote + '。已填写的内容不会被覆盖。');
 }
 
 function normalizeAutofillItem(item) {
@@ -548,7 +657,7 @@ function renderAutofillCandidates(candidates) {
     button.addEventListener('click', function () {
       var item = autofillCandidates[parseInt(button.dataset.autofillIndex, 10)];
       applyAutofillData(item);
-      hideAutofillPanel();
+      renderAutofillTitleSuggestion(item);
       setAutofillStatus('ok', '已应用候选信息。已填写的内容不会被覆盖。');
     });
   });
@@ -563,6 +672,40 @@ function applyAutofillData(item) {
   if (tags.length && !document.getElementById('mTags').value.trim()) {
     document.getElementById('mTags').value = tags.join(', ');
   }
+}
+
+function renderAutofillTitleSuggestion(item) {
+  var suggestedTitle = getSuggestedTitle(item);
+  if (!suggestedTitle || !autofillPanel) {
+    hideAutofillPanel();
+    return;
+  }
+
+  autofillPanel.hidden = false;
+  autofillPanel.innerHTML = [
+    '<div class="autofill-title-suggestion">',
+    '<div>',
+    '<p class="autofill-panel-title">建议标题</p>',
+    '<strong>' + esc(suggestedTitle) + '</strong>',
+    '<span>标题不会自动覆盖，确认后再应用。</span>',
+    '</div>',
+    '<button class="autofill-apply" type="button" data-autofill-title="' + escAttr(suggestedTitle) + '">应用标题</button>',
+    '</div>'
+  ].join('');
+
+  autofillPanel.querySelector('[data-autofill-title]').addEventListener('click', function (buttonEvent) {
+    document.getElementById('mTitle').value = buttonEvent.currentTarget.dataset.autofillTitle;
+    hideAutofillPanel();
+    setAutofillStatus('ok', '已应用建议标题。');
+  });
+}
+
+function getSuggestedTitle(item) {
+  if (!item || !item.title) return '';
+  var currentTitle = document.getElementById('mTitle').value.trim();
+  var suggestedTitle = cleanString(item.title);
+  if (!suggestedTitle || suggestedTitle === currentTitle) return '';
+  return suggestedTitle;
 }
 
 function fillEmptyField(id, value) {
@@ -999,10 +1142,11 @@ function escAttr(value) {
 function boot() {
   try {
     initFirestore();
-    loadItems();
   } catch (error) {
-    renderLoadError(getErrorMessage(error));
+    db = null;
+    dashboardNote.textContent = getErrorMessage(error);
   }
+  loadItems();
   runHealthCheck();
 }
 

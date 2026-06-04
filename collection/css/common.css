@@ -696,44 +696,44 @@ body.page-leaving::before {
 }
 
 .showcase-cover-stack img:nth-child(1) {
-  left: 10px;
-  top: 12px;
-  transform: rotate(-9deg);
+  left: var(--cover-left, 10px);
+  top: var(--cover-top, 12px);
+  transform: rotate(var(--cover-rotate, -9deg));
 }
 
 .showcase-cover-stack img:nth-child(2) {
-  left: 43px;
-  top: 2px;
-  transform: rotate(4deg);
+  left: var(--cover-left, 43px);
+  top: var(--cover-top, 2px);
+  transform: rotate(var(--cover-rotate, 4deg));
 }
 
 .showcase-cover-stack img:nth-child(3) {
-  right: 10px;
-  top: 12px;
-  transform: rotate(11deg);
+  left: var(--cover-left, 72px);
+  top: var(--cover-top, 12px);
+  transform: rotate(var(--cover-rotate, 11deg));
 }
 
 .showcase-cover-stack img:nth-child(4) {
-  left: 58px;
-  bottom: 0;
-  transform: rotate(-3deg);
-  opacity: 0.86;
+  left: var(--cover-left, 58px);
+  top: var(--cover-top, 14px);
+  transform: rotate(var(--cover-rotate, -3deg));
+  opacity: 1;
 }
 
 .category-showcase-card:hover .showcase-cover-stack img:nth-child(1) {
-  transform: translate(-4px, -3px) rotate(-11deg);
+  transform: translate(var(--cover-hover-x, -4px), var(--cover-hover-y, -3px)) rotate(var(--cover-hover-rotate, -11deg));
 }
 
 .category-showcase-card:hover .showcase-cover-stack img:nth-child(2) {
-  transform: translate(0, -6px) rotate(6deg);
+  transform: translate(var(--cover-hover-x, 0), var(--cover-hover-y, -6px)) rotate(var(--cover-hover-rotate, 6deg));
 }
 
 .category-showcase-card:hover .showcase-cover-stack img:nth-child(3) {
-  transform: translate(5px, -3px) rotate(13deg);
+  transform: translate(var(--cover-hover-x, 5px), var(--cover-hover-y, -3px)) rotate(var(--cover-hover-rotate, 13deg));
 }
 
 .category-showcase-card:hover .showcase-cover-stack img:nth-child(4) {
-  transform: translate(2px, 4px) rotate(-5deg);
+  transform: translate(var(--cover-hover-x, 2px), var(--cover-hover-y, 4px)) rotate(var(--cover-hover-rotate, -5deg));
 }
 
 .showcase-card-content {
@@ -1765,11 +1765,11 @@ body.nav-menu-open {
   }
 
   .showcase-cover-stack img:nth-child(2) {
-    left: 35px;
+    left: var(--cover-left, 35px);
   }
 
   .showcase-cover-stack img:nth-child(4) {
-    left: 44px;
+    left: var(--cover-left, 44px);
   }
 
   .image-gallery {
