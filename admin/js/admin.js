@@ -493,6 +493,8 @@ function editItem(id) {
   document.getElementById('mCat').value = CATEGORIES.indexOf(item.category) === -1 ? 'music' : item.category;
   document.getElementById('mTitle').value = item.title || '';
   document.getElementById('mArtist').value = item.artist || '';
+  var clueInput = document.getElementById('mClue');
+  if (clueInput) clueInput.value = '';
   document.getElementById('mCover').value = item.coverUrl || '';
   document.getElementById('mDesc').value = item.description || '';
   document.getElementById('mTags').value = normalizeTags(item.tags).join(', ');
@@ -508,10 +510,12 @@ function editItem(id) {
 function handleAutofill() {
   var title = document.getElementById('mTitle').value.trim();
   var artist = document.getElementById('mArtist').value.trim();
+  var clueInput = document.getElementById('mClue');
+  var clue = clueInput ? clueInput.value.trim() : '';
   var category = document.getElementById('mCat').value;
 
-  if (!title) {
-    setAutofillStatus('warn', '先输入标题，再进行智能填充。');
+  if (!title && !clue) {
+    setAutofillStatus('warn', '请输入标题或识别线索。');
     document.getElementById('mTitle').focus();
     return;
   }
@@ -528,7 +532,7 @@ function handleAutofill() {
   }
 
   setAutofillLoading(true);
-  setAutofillStatus('', artist ? '正在用标题和作者/导演信息查询...' : '正在用标题查询...');
+  setAutofillStatus('', getAutofillLoadingMessage(title, artist, clue));
   hideAutofillPanel();
 
   fetch(endpoint, {
@@ -538,6 +542,7 @@ function handleAutofill() {
       category: category,
       title: title,
       artist: artist,
+      clue: clue,
       current: {
         description: document.getElementById('mDesc').value.trim(),
         tags: parseTags(document.getElementById('mTags').value),
@@ -612,21 +617,31 @@ function normalizeAutofillItem(item) {
     description: cleanString(item.description),
     tags: normalizeTags(item.tags),
     year: normalizeYear(item.year),
+    coverUrl: cleanString(item.coverUrl || item.cover || item.image || item.picUrl),
+    link: cleanString(item.link || item.url || item.sourceUrl),
     confidence: Number(item.confidence) || 0,
     needsMoreContext: Boolean(item.needsMoreContext),
     candidates: item.candidates
   };
 }
 
+function getAutofillLoadingMessage(title, artist, clue) {
+  if (title && artist && clue) return '正在用标题、作者/导演和识别线索查询...';
+  if (title && artist) return '正在用标题和作者/导演信息查询...';
+  if (title && clue) return '正在用标题和识别线索查询...';
+  if (clue) return '正在用识别线索查询...';
+  return '正在查询...';
+}
+
 function normalizeAutofillCandidates(candidates) {
   if (!Array.isArray(candidates)) return [];
   return candidates.map(normalizeAutofillItem).filter(function (item) {
-    return item.title || item.artist || item.description || item.year || item.tags.length;
+    return item.title || item.artist || item.description || item.year || item.coverUrl || item.link || item.tags.length;
   }).slice(0, 5);
 }
 
 function hasUsefulAutofillData(item) {
-  return Boolean(item.artist || item.description || item.year || item.tags.length);
+  return Boolean(item.artist || item.description || item.year || item.coverUrl || item.link || item.tags.length);
 }
 
 function renderAutofillCandidates(candidates) {
@@ -665,7 +680,9 @@ function renderAutofillCandidates(candidates) {
 
 function applyAutofillData(item) {
   fillEmptyField('mArtist', item.artist);
+  fillEmptyField('mCover', item.coverUrl);
   fillEmptyField('mDesc', item.description);
+  fillEmptyField('mLink', item.link);
   fillEmptyField('mYear', item.year);
 
   var tags = normalizeTags(item.tags);
@@ -742,7 +759,7 @@ function resetAutofillUi() {
   autofillCandidates = [];
   hideAutofillPanel();
   setAutofillLoading(false);
-  setAutofillStatus('', '输入标题后可自动识别作者、描述、标签和年份。');
+  setAutofillStatus('', '输入标题或识别线索后可自动识别作者、描述、标签和年份。');
 }
 
 function hideAutofillPanel() {

@@ -15,7 +15,7 @@ CurioVault 是一个个人收藏夹网站，用来整理自己觉得不错、也
 ```text
 admin/       后台管理界面
 collection/  前台收藏网站
-api/         Vercel Serverless Function，用于 MiniMax 智能填充代理
+api/         Vercel Serverless Function，用于小米 MiMo 智能填充代理
 ```
 
 ## 数据字段
@@ -54,13 +54,26 @@ admin/index.html
 
 ## 智能填充
 
-后台“添加作品 / 编辑作品”弹窗里的“一键填充”会调用 Vercel Serverless Function `/api/autofillCollectionItem`，再由服务端请求 MiniMax API。不要把 MiniMax API Key 写进前端文件。
+后台“添加作品 / 编辑作品”弹窗里的“一键填充”会调用 Vercel Serverless Function `/api/autofillCollectionItem`，再由服务端请求小米 MiMo API。不要把 MiMo API Key 写进前端文件。
 
 在 Vercel 项目设置里添加环境变量：
 
 ```text
-MINIMAX_API_KEY=你的 MiniMax API Key
-MINIMAX_MODEL=MiniMax-M2.7
+MIMO_API_KEY=你的 MiMo API Key
+MIMO_MODEL=mimo-v2.5-pro
+```
+
+音乐分类会优先调用网易云音乐开放平台搜索歌曲，再调用“批量获取歌曲信息”补全封面、歌手、专辑和曲风标签，最后交给 MiMo 整理描述和标签。未配置网易云环境变量或接口失败时，会自动回退到 MiMo。按你的网易云开放平台应用配置填写：
+
+```text
+NETEASE_MUSIC_SEARCH_URL=网易云官方歌曲搜索接口地址
+NETEASE_MUSIC_SEARCH_METHOD=POST
+NETEASE_MUSIC_SONG_LIST_URL=https://openapi.music.163.com/openapi/music/basic/song/list/get/v2
+NETEASE_MUSIC_SONG_LIST_METHOD=POST
+NETEASE_MUSIC_APP_ID=你的网易云 AppID
+NETEASE_MUSIC_ACCESS_TOKEN=你的网易云 accessToken
+NETEASE_MUSIC_APP_SECRET=你的网易云 App Secret
+NETEASE_MUSIC_DEVICE={"deviceType":"andrwear","os":"otos","appVer":"0.1","channel":"hm","model":"kys","deviceId":"357","brand":"hm","osVer":"8.1.0"}
 ```
 
 如果后台和 API 都部署在同一个 Vercel 项目，后台会自动请求：
