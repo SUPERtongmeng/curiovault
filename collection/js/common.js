@@ -1,6 +1,14 @@
 // Shared front-end shell: navigation, theme, mobile menu, and home background.
 (function () {
   var STORAGE_KEY = 'xiao-xi-theme';
+  var CATEGORY_LABELS = {
+    music: '音乐',
+    movie: '电影',
+    tv: '电视剧',
+    books: '书籍',
+    images: '图片',
+    articles: '文章'
+  };
   var NAV_ITEMS = [
     { href: 'index.html', label: '首页', icon: 'fa-house' },
     { href: 'music.html', label: '音乐', icon: 'fa-music' },
@@ -18,6 +26,7 @@
   initCoverBg();
   initHomeStats();
   initCategoryShowcase();
+  initRecentCollection();
   initMusicPlayer();
 
   function applySavedTheme() {
@@ -274,6 +283,189 @@
     }).catch(function (error) {
       console.warn('Category showcase Firestore read failed:', error);
     });
+  }
+
+  function initRecentCollection() {
+    var section = document.getElementById('recentCollection');
+    var feature = document.getElementById('recentFeature');
+    var filmstrip = document.getElementById('recentFilmstrip');
+    if (!section || !feature || !filmstrip) return;
+
+    feature.innerHTML = '<p class="collection-empty">正在读取最近收藏...</p>';
+    filmstrip.innerHTML = '';
+
+    loadRecentItemsFromRest()
+      .then(function (items) {
+        renderRecentItems(feature, filmstrip, items);
+      })
+      .catch(function (restError) {
+        console.warn('Recent collection REST read failed:', restError);
+        loadRecentItemsFromSdk()
+          .then(function (items) {
+            renderRecentItems(feature, filmstrip, items);
+          })
+          .catch(function (sdkError) {
+            console.warn('Recent collection Firestore read failed:', sdkError);
+            feature.innerHTML = '<p class="collection-empty">最近收藏加载失败：' + esc(getErrorMessage(restError || sdkError)) + '</p>';
+          });
+      });
+  }
+
+  function loadRecentItemsFromSdk() {
+    var db = initSharedFirestore();
+    if (!db) return Promise.reject(new Error('Firebase SDK 不可用'));
+
+    return db.collection('items')
+      .get()
+      .then(function (snapshot) {
+        return snapshot.docs.map(function (doc) {
+          var data = doc.data() || {};
+          data.id = doc.id;
+          return data;
+        });
+      });
+  }
+
+  function renderRecentItems(feature, filmstrip, sourceItems) {
+    var items = sourceItems.sort(function (a, b) {
+      return getItemTime(b.createdAt) - getItemTime(a.createdAt);
+    }).slice(0, 8);
+
+    if (!items.length) {
+      feature.innerHTML = '<p class="collection-empty">还没有最近收藏</p>';
+      filmstrip.innerHTML = '';
+      return;
+    }
+
+    renderRecentFeature(feature, items[0]);
+    renderRecentFilmstrip(filmstrip, items.slice(1));
+  }
+
+  function loadRecentItemsFromRest() {
+    var restUrl = getFirestoreRestUrl();
+    if (!restUrl) return Promise.reject(new Error('Firebase 配置未加载'));
+
+    return fetch(restUrl)
+      .then(function (response) {
+        return response.json().catch(function () {
+          return {};
+        }).then(function (data) {
+          if (!response.ok) {
+            throw new Error((data.error && data.error.message) || 'REST 读取失败');
+          }
+          return (data.documents || []).map(normalizeRestItem);
+        });
+      });
+  }
+
+  function getFirestoreRestUrl() {
+    if (typeof FIREBASE_CONFIG === 'undefined' || !FIREBASE_CONFIG.projectId || !FIREBASE_CONFIG.apiKey) {
+      return '';
+    }
+    return 'https://firestore.googleapis.com/v1/projects/'
+      + encodeURIComponent(FIREBASE_CONFIG.projectId)
+      + '/databases/(default)/documents/items?key='
+      + encodeURIComponent(FIREBASE_CONFIG.apiKey);
+  }
+
+  function normalizeRestItem(doc) {
+    var data = decodeRestFields(doc.fields || {});
+    data.id = getRestDocId(doc.name);
+    return data;
+  }
+
+  function decodeRestFields(fields) {
+    var output = {};
+    Object.keys(fields).forEach(function (key) {
+      output[key] = decodeRestValue(fields[key]);
+    });
+    return output;
+  }
+
+  function decodeRestValue(value) {
+    if (!value) return null;
+    if (Object.prototype.hasOwnProperty.call(value, 'stringValue')) return value.stringValue;
+    if (Object.prototype.hasOwnProperty.call(value, 'integerValue')) return Number(value.integerValue);
+    if (Object.prototype.hasOwnProperty.call(value, 'doubleValue')) return Number(value.doubleValue);
+    if (Object.prototype.hasOwnProperty.call(value, 'booleanValue')) return Boolean(value.booleanValue);
+    if (Object.prototype.hasOwnProperty.call(value, 'timestampValue')) return value.timestampValue;
+    if (value.arrayValue) return (value.arrayValue.values || []).map(decodeRestValue);
+    if (value.mapValue) return decodeRestFields(value.mapValue.fields || {});
+    return null;
+  }
+
+  function getRestDocId(name) {
+    var parts = String(name || '').split('/');
+    return parts[parts.length - 1] || '';
+  }
+
+  function renderRecentCover(item) {
+    var title = item.title || '?';
+    var letter = title.charAt(0) || '?';
+    if (item.coverUrl) {
+      return '<img src="' + escAttr(item.coverUrl) + '" alt="" loading="lazy" decoding="async" data-letter="' + escAttr(letter) + '" onerror="var s=document.createElement(\'span\');s.className=\'recent-cover-letter\';s.textContent=this.dataset.letter || \'?\';this.parentNode.replaceChild(s,this);" />';
+    }
+    return '<span class="recent-cover-letter">' + esc(letter) + '</span>';
+  }
+
+  function renderRecentFeature(target, item) {
+    target.innerHTML = [
+      '<a class="recent-feature-card" href="' + getItemPageHref(item.category) + '">',
+      '<div class="recent-feature-cover">' + renderRecentCover(item) + '</div>',
+      '<div class="recent-feature-info">',
+      '<span class="recent-cat recent-cat-' + escAttr(getDisplayCategory(item.category)) + '">' + esc(getCategoryLabelForDisplay(item.category)) + '</span>',
+      '<h3>' + esc(item.title || '未命名收藏') + '</h3>',
+      '<p>' + esc(item.description || item.artist || '暂无描述') + '</p>',
+      '<div class="recent-meta">',
+      '<span>' + esc(item.artist || '未填写作者') + '</span>',
+      '<span>' + esc(item.year || formatRecentDate(item.createdAt)) + '</span>',
+      '</div>',
+      '</div>',
+      '</a>'
+    ].join('');
+  }
+
+  function renderRecentFilmstrip(target, items) {
+    target.innerHTML = items.map(function (item) {
+      return [
+        '<a class="recent-strip-item recent-strip-' + escAttr(getDisplayCategory(item.category)) + '" href="' + getItemPageHref(item.category) + '">',
+        '<div class="recent-strip-cover">' + renderRecentCover(item) + '</div>',
+        '<strong class="recent-strip-title">' + esc(item.title || '未命名收藏') + '</strong>',
+        '<span class="recent-strip-author">' + esc(item.artist || '未填写作者') + '</span>',
+        '<span class="recent-strip-year">' + esc(item.year || formatRecentDate(item.createdAt)) + '</span>',
+        '</a>'
+      ].join('');
+    }).join('');
+  }
+
+  function getItemPageHref(category) {
+    if (category === 'music') return 'music.html';
+    if (category === 'movie' || category === 'tv') return 'film.html';
+    if (category === 'books') return 'books.html';
+    if (category === 'images') return 'images.html';
+    if (category === 'articles') return 'articles.html';
+    return 'index.html';
+  }
+
+  function getDisplayCategory(category) {
+    return category === 'movie' || category === 'tv' ? 'film' : (category || 'unknown');
+  }
+
+  function getCategoryLabelForDisplay(category) {
+    if (category === 'movie' || category === 'tv') return '影视';
+    return CATEGORY_LABELS[category] || '收藏';
+  }
+
+  function getItemTime(value) {
+    if (!value) return 0;
+    if (value.toDate) return value.toDate().getTime();
+    return new Date(value).getTime() || 0;
+  }
+
+  function formatRecentDate(value) {
+    var time = getItemTime(value);
+    if (!time) return '';
+    return new Date(time).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
   }
 
   function pickShowcaseCovers(covers, groupKey) {
@@ -578,5 +770,20 @@
         playing = true;
       }
     });
+  }
+
+  function esc(value) {
+    var div = document.createElement('div');
+    div.textContent = value == null ? '' : String(value);
+    return div.innerHTML;
+  }
+
+  function escAttr(value) {
+    return esc(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function getErrorMessage(error) {
+    if (!error) return '未知错误';
+    return error.message || String(error);
   }
 })();

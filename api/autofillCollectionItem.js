@@ -8,7 +8,9 @@ const CATEGORY_LABELS = {
   articles: '文章'
 };
 
-module.exports = async function handler(req, res) {
+const FORMAT_ERROR_MESSAGE = 'AI 返回格式异常，请重试或补充作者/导演。';
+
+async function handler(req, res) {
   setCorsHeaders(res);
 
   if (req.method === 'OPTIONS') {
@@ -45,7 +47,7 @@ module.exports = async function handler(req, res) {
       },
       body: JSON.stringify({
         model,
-        temperature: 0.2,
+        temperature: 0.15,
         max_completion_tokens: 450,
         messages: [
           {
@@ -71,12 +73,29 @@ module.exports = async function handler(req, res) {
 
     const content = extractMessageContent(payload);
     const parsed = await parseOrRepairModelJson(content, input, { apiKey, baseUrl, model });
-    const result = normalizeModelResult(parsed, input);
-    res.status(200).json(result);
+    res.status(200).json(normalizeModelResult(parsed, input));
   } catch (error) {
     console.error('Autofill failed', error);
-    res.status(500).json({ error: error.message || 'Autofill failed.' });
+    res.status(error instanceof AutofillParseError ? 422 : 500).json({
+      error: getPublicErrorMessage(error)
+    });
   }
+}
+
+module.exports = handler;
+module.exports.__test = {
+  AutofillParseError,
+  FORMAT_ERROR_MESSAGE,
+  buildRepairPrompt,
+  buildSystemPrompt,
+  createFallbackModelResult,
+  extractJsonObject,
+  normalizeModelResult,
+  normalizeRequest,
+  parseModelJson,
+  parseOrRepairModelJson,
+  sanitizeModelText,
+  softRepairJsonText
 };
 
 function setCorsHeaders(res) {
@@ -103,25 +122,26 @@ function normalizeRequest(body) {
 
 function buildSystemPrompt() {
   return [
-    '你是收藏后台元数据助手。只返回一个可被 JSON.parse 解析的 JSON 对象。',
-    '禁止输出 <think>、Markdown、代码块、解释文字或 JSON 之外的任何内容。',
-    '根据 category/title/artist 识别作品。artist 有值时作为强约束。',
+    '你是收藏后台元数据助手。只返回一行合法 JSON 对象，不要换行数组，不要输出 JSON 之外的内容。',
+    '禁止输出 <think>、Markdown、代码块、解释文字。',
+    '根据 category/title/artist 识别作品；artist 有值时作为强约束。',
     '同名且不确定时返回 needsMoreContext=true，并给 candidates 2-5 项；不要强行确定。',
     '不要编造；不确定字段用空字符串或空数组。',
-    'title 使用作品原始语言标题；如果原始标题不是中文且有常用中文译名，格式为“原始标题（中文翻译）”，例如 The Creation of Adam（创造亚当）、千と千尋の神隠し（千与千寻）。',
+    'title 使用作品原始语言标题；如果原始标题不是中文且有常用中文译名，格式为“原始标题（中文翻译）”。例如 The Creation of Adam（创造亚当）、千と千尋の神隠し（千与千寻）。',
     '如果作品原始标题就是中文，title 只保留中文原名，例如 三体；不要额外加括号。',
     'artist 使用创作者原始语言姓名或国际通用姓名，不要默认翻译成中文，例如 Michelangelo Buonarroti、宮崎駿。',
-    'description 中文 40-70 字；tags 为 3-5 个中文短标签；year 优先返回明确数字年份，不确定时可为空。',
-    '格式：{"item":{"title":"","artist":"","description":"","tags":[],"year":"","confidence":0,"needsMoreContext":false},"candidates":[],"needsMoreContext":false}'
+    'description 用中文 40-70 字；tags 必须是一行中文字符串数组，例如 "tags":["经典","文艺","电影"]；year 优先返回明确数字年份，不确定时为空字符串。',
+    '严格返回这个结构：{"item":{"title":"","artist":"","description":"","tags":[],"year":"","confidence":0,"needsMoreContext":false},"candidates":[],"needsMoreContext":false}'
   ].join('\n');
 }
 
 function buildRepairPrompt(rawText, input) {
   return [
-    '把下面模型输出修复为一个合法 JSON 对象，只返回 JSON，不要解释。',
+    '把下面模型输出修复为一个合法 JSON 对象，只返回一行 JSON，不要解释。',
+    '必须使用双引号；数组元素之间必须有逗号；不要 Markdown；不要 <think>。',
     '如果原文没有可靠作品信息，根据输入生成 needsMoreContext=true 的 JSON。',
-    '保留 title 的语言规则：非中文原名用“原始标题（中文翻译）”，中文原名只保留中文；artist 使用原始语言姓名或国际通用姓名。',
-    'description 和 tags 必须是中文；year 优先为明确数字年份。',
+    '保留 title 语言规则：非中文原名用“原始标题（中文翻译）”，中文原名只保留中文；artist 使用原始语言姓名或国际通用姓名。',
+    'description 和 tags 必须是中文；tags 必须是字符串数组；year 优先为明确数字年份。',
     '目标格式：{"item":{"title":"","artist":"","description":"","tags":[],"year":"","confidence":0,"needsMoreContext":false},"candidates":[],"needsMoreContext":false}',
     '输入：' + JSON.stringify(input),
     '原文：' + cleanString(rawText).slice(0, 2500)
@@ -135,30 +155,41 @@ function extractMessageContent(payload) {
 }
 
 function parseModelJson(content) {
-  let text = cleanString(content)
-    .replace(/<think>[\s\S]*?<\/think>/gi, '')
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/```$/i, '')
-    .trim();
+  const candidates = getParseCandidates(content);
+  let lastError = null;
 
-  if (!text) throw new Error('MiniMax returned an empty response.');
-
-  const firstBrace = text.indexOf('{');
-  const lastBrace = text.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    text = text.slice(firstBrace, lastBrace + 1);
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch (error) {
+      lastError = error;
+    }
   }
 
-  return JSON.parse(text);
+  throw new AutofillParseError(FORMAT_ERROR_MESSAGE, {
+    cause: lastError,
+    sample: cleanString(content).slice(0, 500)
+  });
 }
 
 async function parseOrRepairModelJson(content, input, options) {
   try {
     return parseModelJson(content);
-  } catch (error) {
-    const repaired = await repairModelJson(content, input, options);
-    return parseModelJson(repaired);
+  } catch (firstError) {
+    try {
+      const repaired = await repairModelJson(content, input, options);
+      return parseModelJson(repaired);
+    } catch (repairError) {
+      console.warn('MiniMax JSON parse failed', {
+        firstError: firstError && firstError.message,
+        repairError: repairError && repairError.message,
+        sample: cleanString(content).slice(0, 500)
+      });
+      throw new AutofillParseError(FORMAT_ERROR_MESSAGE, {
+        cause: repairError,
+        sample: cleanString(content).slice(0, 500)
+      });
+    }
   }
 }
 
@@ -177,7 +208,7 @@ async function repairModelJson(content, input, options) {
         {
           role: 'system',
           name: 'CurioVault',
-          content: '你是 JSON 修复器。只返回合法 JSON。'
+          content: '你是 JSON 修复器。只返回一行合法 JSON。'
         },
         {
           role: 'user',
@@ -193,29 +224,115 @@ async function repairModelJson(content, input, options) {
   return extractMessageContent(payload);
 }
 
+function getParseCandidates(content) {
+  const sanitized = sanitizeModelText(content);
+  const extracted = extractJsonObject(sanitized);
+  const base = uniqueStrings([
+    sanitized,
+    extracted,
+    softRepairJsonText(sanitized),
+    softRepairJsonText(extracted)
+  ]);
+
+  return base.filter(Boolean);
+}
+
+function sanitizeModelText(content) {
+  return cleanString(content)
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .trim();
+}
+
+function extractJsonObject(text) {
+  const value = cleanString(text);
+  const start = value.indexOf('{');
+  if (start === -1) return value;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) continue;
+    if (char === '{') depth += 1;
+    if (char === '}') depth -= 1;
+
+    if (depth === 0) return value.slice(start, index + 1);
+  }
+
+  return value.slice(start);
+}
+
+function softRepairJsonText(text) {
+  return cleanString(text)
+    .replace(/,\s*([}\]])/g, '$1')
+    .replace(/"(\s+)"/g, '","')
+    .replace(/"\s+(?="[\w\u4e00-\u9fa5])/g, '",')
+    .replace(/]\s+(?="[\w\u4e00-\u9fa5])/g, '],')
+    .replace(/}\s+(?="[\w\u4e00-\u9fa5])/g, '},');
+}
+
 function normalizeModelResult(data, input) {
-  const item = normalizeItem(data.item || data.result || data, input);
-  const candidates = Array.isArray(data.candidates)
-    ? data.candidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData).slice(0, 5)
+  const safeData = data && typeof data === 'object' ? data : createFallbackModelResult(input);
+  const item = normalizeItem(safeData.item || safeData.result || safeData, input);
+  const candidates = Array.isArray(safeData.candidates)
+    ? safeData.candidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData).slice(0, 5)
     : [];
 
   return {
     item,
     candidates,
-    needsMoreContext: Boolean(data.needsMoreContext || item.needsMoreContext)
+    needsMoreContext: Boolean(safeData.needsMoreContext || item.needsMoreContext)
+  };
+}
+
+function createFallbackModelResult(input) {
+  return {
+    item: {
+      title: input && input.title ? input.title : '',
+      artist: '',
+      description: '',
+      tags: [],
+      year: '',
+      confidence: 0,
+      needsMoreContext: true
+    },
+    candidates: [],
+    needsMoreContext: true
   };
 }
 
 function normalizeItem(item, input) {
-  item = item || {};
+  const safeItem = item && typeof item === 'object' ? item : {};
   return {
-    title: cleanString(item.title || input.title).slice(0, 120),
-    artist: cleanString(item.artist || item.creator || item.author || item.director).slice(0, 120),
-    description: cleanString(item.description).slice(0, 180),
-    tags: normalizeTags(item.tags),
-    year: cleanString(item.year).slice(0, 24),
-    confidence: clampConfidence(item.confidence),
-    needsMoreContext: Boolean(item.needsMoreContext)
+    title: cleanString(safeItem.title || (input && input.title)).slice(0, 120),
+    artist: cleanString(safeItem.artist || safeItem.creator || safeItem.author || safeItem.director).slice(0, 120),
+    description: cleanString(safeItem.description).slice(0, 180),
+    tags: normalizeTags(safeItem.tags),
+    year: cleanString(safeItem.year).slice(0, 24),
+    confidence: clampConfidence(safeItem.confidence),
+    needsMoreContext: Boolean(safeItem.needsMoreContext)
   };
 }
 
@@ -244,6 +361,10 @@ function cleanString(value) {
   return String(value).trim();
 }
 
+function uniqueStrings(values) {
+  return values.filter(Boolean).filter((value, index, list) => list.indexOf(value) === index);
+}
+
 function normalizeBaseUrl(value) {
   return cleanString(value).replace(/\/+$/, '');
 }
@@ -255,3 +376,19 @@ function getMiniMaxError(payload) {
   if (payload.message) return payload.message;
   return 'MiniMax request failed.';
 }
+
+function getPublicErrorMessage(error) {
+  if (error instanceof AutofillParseError) return error.message;
+  if (!error) return 'Autofill failed.';
+  return error.message || String(error);
+}
+
+function AutofillParseError(message, details) {
+  this.name = 'AutofillParseError';
+  this.message = message || FORMAT_ERROR_MESSAGE;
+  this.details = details || {};
+  if (Error.captureStackTrace) Error.captureStackTrace(this, AutofillParseError);
+}
+
+AutofillParseError.prototype = Object.create(Error.prototype);
+AutofillParseError.prototype.constructor = AutofillParseError;
