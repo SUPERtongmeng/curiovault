@@ -5,6 +5,7 @@ const {
   AutofillParseError,
   FORMAT_ERROR_MESSAGE,
   createMusicCandidateFallback,
+  createFallbackModelResult,
   normalizeNetEaseSongCandidates,
   normalizeModelResult,
   normalizeRequest,
@@ -269,6 +270,16 @@ const tests = [
       assert.equal(fallback.item.artist, '林俊杰');
       assert.equal(fallback.candidates.length, 1);
       assert.equal(fallback.needsMoreContext, false);
+    }
+  },
+  {
+    name: 'parse failure fallback is structured and non-empty title',
+    run() {
+      const fallback = createFallbackModelResult(input);
+      assert.equal(fallback.item.title, 'Wednesday');
+      assert.equal(fallback.item.needsMoreContext, true);
+      assert.equal(fallback.needsMoreContext, true);
+      assert.deepEqual(fallback.candidates, []);
     }
   },
   {

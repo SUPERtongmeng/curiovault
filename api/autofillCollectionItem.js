@@ -64,6 +64,10 @@ async function handler(req, res) {
     res.status(200).json(result);
   } catch (error) {
     console.error('Autofill failed', error);
+    if (error instanceof AutofillParseError) {
+      res.status(200).json(createFallbackModelResult(input));
+      return;
+    }
     res.status(error instanceof AutofillParseError ? 422 : 500).json({
       error: getPublicErrorMessage(error)
     });
@@ -78,6 +82,7 @@ module.exports.__test = {
   buildSystemPrompt,
   createFallbackModelResult,
   createMusicCandidateFallback,
+  getPublicErrorMessage,
   extractJsonObject,
   normalizeNetEaseSongCandidates,
   normalizeModelResult,
