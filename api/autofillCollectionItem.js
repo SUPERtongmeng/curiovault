@@ -149,7 +149,12 @@ function buildRepairPrompt(rawText, input) {
 function extractMessageContent(payload) {
   const choice = payload && payload.choices && payload.choices[0];
   if (!choice || !choice.message) return '';
-  return choice.message.content || '';
+  if (Array.isArray(choice.message.content)) {
+    return choice.message.content.map(function (part) {
+      return typeof part === 'string' ? part : cleanString(part && (part.text || part.content));
+    }).join('');
+  }
+  return choice.message.content || choice.message.reasoning_content || '';
 }
 
 async function requestModelJson(input, options) {
@@ -163,6 +168,8 @@ async function requestModelJson(input, options) {
       model: options.model,
       temperature: 0.15,
       max_completion_tokens: 520,
+      response_format: { type: 'json_object' },
+      thinking: { type: 'disabled' },
       messages: [
         {
           role: 'system',
@@ -407,6 +414,12 @@ function normalizeArtists(value) {
 }
 
 function parseModelJson(content) {
+  if (!cleanString(content)) {
+    throw new AutofillParseError('AI 返回为空，请重试或补充作者/导演。', {
+      sample: ''
+    });
+  }
+
   const candidates = getParseCandidates(content);
   let lastError = null;
 
@@ -456,6 +469,8 @@ async function repairModelJson(content, input, options) {
       model: options.model,
       temperature: 0,
       max_completion_tokens: 350,
+      response_format: { type: 'json_object' },
+      thinking: { type: 'disabled' },
       messages: [
         {
           role: 'system',
