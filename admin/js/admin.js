@@ -425,7 +425,7 @@ function renderLoadError(message) {
 }
 
 function readFormData() {
-  var rating = parseInt(document.getElementById('mRating').value, 10);
+  var rating = clampRating(document.getElementById('mRating').value);
   var year = normalizeYear(document.getElementById('mYear').value);
   var title = document.getElementById('mTitle').value.trim();
   var category = document.getElementById('mCat').value;
@@ -1142,14 +1142,22 @@ function renderTags(tags) {
 function buildStars(rating) {
   var value = clampRating(rating);
   var stars = '';
-  for (var i = 0; i < value; i += 1) stars += '★';
+  for (var i = 1; i <= 5; i += 1) {
+    if (value >= i) {
+      stars += '★';
+    } else if (value >= i - 0.5) {
+      stars += '⯨';
+    } else {
+      stars += '☆';
+    }
+  }
   return esc(stars);
 }
 
 function clampRating(value) {
-  var rating = parseInt(value, 10);
+  var rating = parseFloat(value);
   if (!Number.isFinite(rating)) return 4;
-  return Math.max(1, Math.min(5, rating));
+  return Math.max(1, Math.min(5, Math.round(rating * 2) / 2));
 }
 
 function formatDate(timestamp) {

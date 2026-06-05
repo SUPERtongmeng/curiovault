@@ -228,9 +228,17 @@
   }
 
   function stars(value) {
-    var rating = Math.max(1, Math.min(5, parseInt(value, 10) || 4));
+    var rating = Math.max(1, Math.min(5, Math.round((parseFloat(value) || 4) * 2) / 2));
     var out = '';
-    for (var i = 0; i < rating; i += 1) out += '★';
+    for (var i = 1; i <= 5; i += 1) {
+      if (rating >= i) {
+        out += '★';
+      } else if (rating >= i - 0.5) {
+        out += '⯨';
+      } else {
+        out += '☆';
+      }
+    }
     return out;
   }
 
