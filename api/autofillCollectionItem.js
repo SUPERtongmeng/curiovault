@@ -12,6 +12,30 @@ const FORMAT_ERROR_MESSAGE = 'AI 返回格式异常，请重试或补充作者/�
 const NETEASE_DEFAULT_SEARCH_URL = 'https://openapi.music.163.com/openapi/music/basic/search/song/get/v3';
 const NETEASE_DEFAULT_SONG_LIST_URL = 'https://openapi.music.163.com/openapi/music/basic/song/list/get/v2';
 const NETEASE_DEFAULT_SONG_DETAIL_URL = 'https://openapi.music.163.com/openapi/music/basic/song/detail/get/v2';
+const MAX_CANDIDATES = 3;
+const ORIGINAL_ARTIST_ALIASES = {
+  '彼得·威尔': 'Peter Weir',
+  '彼得威尔': 'Peter Weir',
+  '宫崎骏': '宮崎駿',
+  '宫崎駿': '宮崎駿',
+  '村上春树': '村上春樹',
+  '葛饰北斋': '葛飾北斎',
+  '梵高': 'Vincent van Gogh',
+  '文森特·梵高': 'Vincent van Gogh',
+  '达·芬奇': 'Leonardo da Vinci',
+  '达芬奇': 'Leonardo da Vinci',
+  '莱昂纳多·达·芬奇': 'Leonardo da Vinci',
+  '米开朗基罗': 'Michelangelo Buonarroti',
+  '乔治·奥威尔': 'George Orwell',
+  '加西亚·马尔克斯': 'Gabriel García Márquez',
+  '马尔克斯': 'Gabriel García Márquez'
+};
+const ORIGINAL_ARTIST_TITLE_OVERRIDES = {
+  'tv:东京爱情故事': '坂元裕二',
+  'movie:楚门的世界': 'Peter Weir',
+  'images:神奈川冲浪里': '葛飾北斎',
+  'books:挪威的森林': '村上春樹'
+};
 
 async function handler(req, res) {
   setCorsHeaders(res);
@@ -59,7 +83,7 @@ async function handler(req, res) {
     });
     const result = normalizeModelResult(parsed, input);
     if (input.category === 'music' && input.musicCandidates.length && !result.candidates.length) {
-      result.candidates = input.musicCandidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData).slice(0, 5);
+      result.candidates = input.musicCandidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData).slice(0, MAX_CANDIDATES);
     }
     res.status(200).json(result);
   } catch (error) {
@@ -78,6 +102,7 @@ module.exports = handler;
 module.exports.__test = {
   AutofillParseError,
   FORMAT_ERROR_MESSAGE,
+  MAX_CANDIDATES,
   buildRepairPrompt,
   buildSystemPrompt,
   createFallbackModelResult,
@@ -85,6 +110,7 @@ module.exports.__test = {
   getPublicErrorMessage,
   extractJsonObject,
   normalizeNetEaseSongCandidates,
+  normalizeOriginalArtistName,
   normalizeModelResult,
   normalizeRequest,
   parseModelJson,
@@ -120,15 +146,15 @@ function buildSystemPrompt() {
   return [
     '你是收藏后台元数据助手。只返回一行合法 JSON 对象，不要换行数组，不要输出 JSON 之外的内容。',
     '禁止输出 <think>、Markdown、代码块、解释文字。',
-    '根据 category/title/artist/clue 识别作品；artist 有值时作为强约束。',
+    '根据 category/title/artist/clue 识别作品；artist 有值时只作为识别作品的强约束，不代表输出 artist 可以照抄输入。',
     'clue 是用户输入的识别线索，可能是抽象描述、剧情、画面、主题或记忆片段；它只用于识别作品，不是最终 description，不要直接复制 clue 作为 description。',
     '当 category=music 且输入里有 musicCandidates 时，只能从 musicCandidates 中选择最匹配歌曲；可生成中文 description 和 tags，但 title/artist/year/coverUrl/link 必须优先使用候选原始字段。',
-    '同名且不确定时返回 needsMoreContext=true，并给 candidates 2-5 项；不要强行确定。',
+    '同名且不确定时返回 needsMoreContext=true，并给 candidates 2-3 项；不要强行确定。category=music 且 title 很短或常见（例如 Hero、Lemon、Stay）时，如果没有 musicCandidates，也必须根据常识返回最多 3 个最可能的歌曲 candidates 供用户选择，不要返回空结果。',
     '不要编造；不确定字段用空字符串或空数组。',
-    'artist 字段按分类填写：音乐填歌手/艺术家；电影填导演；电视剧填主创/导演/编剧中最常用的负责人；书籍填作者；图片填艺术家/摄影师/创作者；文章填作者。能可靠确认时必须填写。',
+    'artist 字段按分类填写：音乐填歌手/艺术家；电影填导演；电视剧填主创/导演/编剧中最常用的负责人；书籍填作者；图片填艺术家/摄影师/创作者；文章填作者。能可靠确认时必须填写。电视剧不要填角色名或演员名，例如 东京爱情故事 不要返回 永尾完治，要返回 坂元裕二。',
     'title 使用作品原始语言标题；如果原始标题不是中文且有常用中文译名，格式为“原始标题（中文翻译）”。例如 The Creation of Adam（创造亚当）、千と千尋の神隠し（千与千寻）。',
     '如果作品原始标题就是中文，title 只保留中文原名，例如 三体；不要额外加括号。',
-    'artist 使用创作者原始语言姓名或国际通用姓名，不要默认翻译成中文，例如 Michelangelo Buonarroti、宮崎駿。',
+    'artist 必须优先使用创作者/团体的原文写法，不要默认翻译成中文，也不要优先改成英文罗马字；如果输入 artist 是中文译名或简体名，输出时必须尽量校正为原文写法。拉丁字母姓名必须返回拉丁原名，禁止返回中文音译名。只有无法可靠确认原文写法时才使用国际通用名。例如 楚门的世界 的导演不要返回 彼得·威尔，要返回 Peter Weir；宫崎骏/Hayao Miyazaki 要返回 宮崎駿；村上春树/Haruki Murakami 要返回 村上春樹；米开朗基罗要返回 Michelangelo Buonarroti；林俊杰仍返回 林俊杰。',
     'description 用中文 40-70 字；tags 必须是一行中文字符串数组，例如 "tags":["经典","文艺","电影"]；year 优先返回明确数字年份，不确定时为空字符串。',
     '严格返回这个结构：{"item":{"title":"","artist":"","description":"","tags":[],"year":"","coverUrl":"","link":"","confidence":0,"needsMoreContext":false},"candidates":[],"needsMoreContext":false}'
   ].join('\n');
@@ -139,7 +165,8 @@ function buildRepairPrompt(rawText, input) {
     '把下面模型输出修复为一个合法 JSON 对象，只返回一行 JSON，不要解释。',
     '必须使用双引号；数组元素之间必须有逗号；不要 Markdown；不要 <think>。',
     '如果原文没有可靠作品信息，根据输入的 title 或 clue 生成 needsMoreContext=true 的 JSON。',
-    '保留 title 语言规则：非中文原名用“原始标题（中文翻译）”，中文原名只保留中文；artist 使用原始语言姓名或国际通用姓名。',
+    '如果是音乐短标题或同名作品，必须保留或生成最多 3 个候选 candidates，不要修成空 candidates。',
+    '保留 title 语言规则：非中文原名用“原始标题（中文翻译）”，中文原名只保留中文；artist 优先使用创作者/团体的原文写法，不要默认翻译成中文，也不要优先改成英文罗马字；如果 artist 是中文译名或简体名，必须尽量校正为原文写法；拉丁字母姓名必须返回拉丁原名，禁止返回中文音译名；无法可靠确认原文写法时才使用国际通用名。',
     'artist 字段按分类填写：音乐=歌手/艺术家，电影=导演，电视剧=主创/导演/编剧，书籍=作者，图片=艺术家/摄影师，文章=作者。',
     'description 和 tags 必须是中文；tags 必须是字符串数组；year 优先为明确数字年份。',
     '目标格式：{"item":{"title":"","artist":"","description":"","tags":[],"year":"","coverUrl":"","link":"","confidence":0,"needsMoreContext":false},"candidates":[],"needsMoreContext":false}',
@@ -566,7 +593,7 @@ function normalizeModelResult(data, input) {
   const safeData = data && typeof data === 'object' ? data : createFallbackModelResult(input);
   const item = normalizeItem(safeData.item || safeData.result || safeData, input);
   const candidates = Array.isArray(safeData.candidates)
-    ? safeData.candidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData).slice(0, 5)
+    ? safeData.candidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData).slice(0, MAX_CANDIDATES)
     : [];
 
   return {
@@ -596,7 +623,7 @@ function createFallbackModelResult(input) {
 
 function createMusicCandidateFallback(input) {
   const candidates = Array.isArray(input && input.musicCandidates)
-    ? input.musicCandidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData).slice(0, 5)
+    ? input.musicCandidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData).slice(0, MAX_CANDIDATES)
     : [];
   return {
     item: candidates[0] || createFallbackModelResult(input).item,
@@ -607,9 +634,11 @@ function createMusicCandidateFallback(input) {
 
 function normalizeItem(item, input) {
   const safeItem = item && typeof item === 'object' ? item : {};
+  const artist = cleanString(safeItem.artist || safeItem.creator || safeItem.author || safeItem.director).slice(0, 120);
+  const title = cleanString(safeItem.title || (input && input.title)).slice(0, 120);
   return {
-    title: cleanString(safeItem.title || (input && input.title)).slice(0, 120),
-    artist: cleanString(safeItem.artist || safeItem.creator || safeItem.author || safeItem.director).slice(0, 120),
+    title,
+    artist: normalizeOriginalArtistName(artist, title, input && input.category),
     description: cleanString(safeItem.description).slice(0, 180),
     tags: normalizeTags(safeItem.tags),
     year: cleanString(safeItem.year).slice(0, 24),
@@ -618,6 +647,14 @@ function normalizeItem(item, input) {
     confidence: clampConfidence(safeItem.confidence),
     needsMoreContext: Boolean(safeItem.needsMoreContext)
   };
+}
+
+function normalizeOriginalArtistName(value, title, category) {
+  const titleKey = `${cleanString(category)}:${cleanString(title)}`;
+  if (ORIGINAL_ARTIST_TITLE_OVERRIDES[titleKey]) return ORIGINAL_ARTIST_TITLE_OVERRIDES[titleKey];
+  const artist = cleanString(value);
+  if (!artist) return '';
+  return ORIGINAL_ARTIST_ALIASES[artist] || artist;
 }
 
 function hasCandidateData(item) {

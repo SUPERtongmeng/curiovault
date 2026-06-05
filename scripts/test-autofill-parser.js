@@ -4,9 +4,13 @@ const api = require('../api/autofillCollectionItem.js');
 const {
   AutofillParseError,
   FORMAT_ERROR_MESSAGE,
+  MAX_CANDIDATES,
+  buildRepairPrompt,
+  buildSystemPrompt,
   createMusicCandidateFallback,
   createFallbackModelResult,
   normalizeNetEaseSongCandidates,
+  normalizeOriginalArtistName,
   normalizeModelResult,
   normalizeRequest,
   parseModelJson
@@ -43,6 +47,156 @@ const completeItem = {
 };
 
 const tests = [
+  {
+    name: 'translated artist aliases are normalized to original names',
+    run() {
+      assert.equal(normalizeOriginalArtistName('彼得·威尔'), 'Peter Weir');
+      assert.equal(normalizeOriginalArtistName('宫崎骏'), '宮崎駿');
+      assert.equal(normalizeOriginalArtistName('乔治·奥威尔'), 'George Orwell');
+      assert.equal(normalizeOriginalArtistName('永尾完治', '东京爱情故事', 'tv'), '坂元裕二');
+      assert.equal(normalizeOriginalArtistName('彼得·威尔', '楚门的世界', 'movie'), 'Peter Weir');
+      assert.equal(normalizeOriginalArtistName('葛饰北斋', '神奈川冲浪里', 'images'), '葛飾北斎');
+
+      const result = normalizeModelResult(parseModelJson(JSON.stringify({
+        item: {
+          title: '楚门的世界',
+          artist: '彼得·威尔',
+          tags: ['电影'],
+          needsMoreContext: false
+        },
+        candidates: [],
+        needsMoreContext: false
+      })), input);
+      assert.equal(result.item.artist, 'Peter Weir');
+
+      const tvInput = normalizeRequest({
+        category: 'tv',
+        title: '东京爱情故事',
+        artist: '',
+        clue: '',
+        current: {}
+      });
+      const tvResult = normalizeModelResult(parseModelJson(JSON.stringify({
+        item: {
+          title: '东京爱情故事',
+          artist: '永尾完治',
+          tags: ['日剧'],
+          needsMoreContext: false
+        },
+        candidates: [],
+        needsMoreContext: false
+      })), tvInput);
+      assert.equal(tvResult.item.artist, '坂元裕二');
+    }
+  },
+  {
+    name: 'model candidates are limited to three',
+    run() {
+      assert.equal(MAX_CANDIDATES, 3);
+      const result = normalizeModelResult(parseModelJson(JSON.stringify({
+        item: { title: 'Hero', tags: [], needsMoreContext: true },
+        candidates: [
+          { title: 'Hero 1', artist: 'Artist 1' },
+          { title: 'Hero 2', artist: 'Artist 2' },
+          { title: 'Hero 3', artist: 'Artist 3' },
+          { title: 'Hero 4', artist: 'Artist 4' }
+        ],
+        needsMoreContext: true
+      })), input);
+      assert.equal(result.candidates.length, 3);
+      assert.equal(result.candidates[2].title, 'Hero 3');
+    }
+  },
+  {
+    name: 'system prompt requires original artist names',
+    run() {
+      const prompt = buildSystemPrompt();
+      assert.match(prompt, /artist 必须优先使用创作者\/团体的原文写法/);
+      assert.match(prompt, /电视剧不要填角色名或演员名/);
+      assert.match(prompt, /东京爱情故事 不要返回 永尾完治，要返回 坂元裕二/);
+      assert.match(prompt, /不代表输出 artist 可以照抄输入/);
+      assert.match(prompt, /不要默认翻译成中文/);
+      assert.match(prompt, /不要优先改成英文罗马字/);
+      assert.match(prompt, /如果输入 artist 是中文译名或简体名/);
+      assert.match(prompt, /拉丁字母姓名必须返回拉丁原名/);
+      assert.match(prompt, /禁止返回中文音译名/);
+      assert.match(prompt, /楚门的世界 的导演不要返回 彼得·威尔，要返回 Peter Weir/);
+      assert.match(prompt, /宫崎骏\/Hayao Miyazaki 要返回 宮崎駿/);
+      assert.match(prompt, /村上春树\/Haruki Murakami 要返回 村上春樹/);
+      assert.match(prompt, /宮崎駿/);
+      assert.match(prompt, /村上春樹/);
+      assert.match(prompt, /Michelangelo Buonarroti/);
+      assert.match(prompt, /林俊杰/);
+      assert.match(prompt, /同名且不确定时返回 needsMoreContext=true，并给 candidates 2-3 项/);
+      assert.match(prompt, /例如 Hero、Lemon、Stay/);
+      assert.match(prompt, /最多 3 个最可能的歌曲 candidates/);
+    }
+  },
+  {
+    name: 'repair prompt keeps original artist name rule',
+    run() {
+      const prompt = buildRepairPrompt('{"item":{"artist":"Hayao Miyazaki"}}', input);
+      assert.match(prompt, /artist 优先使用创作者\/团体的原文写法/);
+      assert.match(prompt, /不要默认翻译成中文/);
+      assert.match(prompt, /不要优先改成英文罗马字/);
+      assert.match(prompt, /如果 artist 是中文译名或简体名/);
+      assert.match(prompt, /拉丁字母姓名必须返回拉丁原名/);
+      assert.match(prompt, /禁止返回中文音译名/);
+      assert.match(prompt, /音乐短标题或同名作品/);
+      assert.match(prompt, /最多 3 个候选 candidates/);
+      assert.match(prompt, /无法可靠确认原文写法时才使用国际通用名/);
+    }
+  },
+  {
+    name: 'japanese creator original name is preserved',
+    run() {
+      const parsed = parseModelJson(JSON.stringify({
+        item: {
+          title: '千と千尋の神隠し（千与千寻）',
+          artist: '宮崎駿',
+          description: '少女误入神灵世界后经历冒险与成长，最终找回勇气和亲情的经典动画电影。',
+          tags: ['动画', '奇幻', '日本电影'],
+          year: '2001',
+          confidence: 0.92,
+          needsMoreContext: false
+        },
+        candidates: [],
+        needsMoreContext: false
+      }));
+      const result = normalizeModelResult(parsed, input);
+      assert.equal(result.item.artist, '宮崎駿');
+      assert.notEqual(result.item.artist, '宫崎骏');
+      assert.notEqual(result.item.artist, 'Hayao Miyazaki');
+    }
+  },
+  {
+    name: 'western and chinese original artist names are preserved',
+    run() {
+      const western = normalizeModelResult(parseModelJson(JSON.stringify({
+        item: {
+          title: 'The Creation of Adam（创造亚当）',
+          artist: 'Michelangelo Buonarroti',
+          tags: ['艺术'],
+          needsMoreContext: false
+        },
+        candidates: [],
+        needsMoreContext: false
+      })), input);
+      assert.equal(western.item.artist, 'Michelangelo Buonarroti');
+
+      const chinese = normalizeModelResult(parseModelJson(JSON.stringify({
+        item: {
+          title: '愿与愁',
+          artist: '林俊杰',
+          tags: ['音乐'],
+          needsMoreContext: false
+        },
+        candidates: [],
+        needsMoreContext: false
+      })), input);
+      assert.equal(chinese.item.artist, '林俊杰');
+    }
+  },
   {
     name: 'normal json',
     run() {

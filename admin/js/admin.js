@@ -637,7 +637,7 @@ function normalizeAutofillCandidates(candidates) {
   if (!Array.isArray(candidates)) return [];
   return candidates.map(normalizeAutofillItem).filter(function (item) {
     return item.title || item.artist || item.description || item.year || item.coverUrl || item.link || item.tags.length;
-  }).slice(0, 5);
+  }).slice(0, 3);
 }
 
 function hasUsefulAutofillData(item) {

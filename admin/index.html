@@ -167,50 +167,64 @@
       </div>
       <form id="modalForm">
         <input type="hidden" id="editId" />
-        <div class="form-group form-cat">
-          <label for="mCat">类别</label>
-          <select id="mCat">
-            <option value="music">音乐</option>
-            <option value="movie">电影</option>
-            <option value="tv">电视剧</option>
-            <option value="books">书籍</option>
-            <option value="images">图片</option>
-            <option value="articles">文章</option>
-          </select>
-        </div>
-        <div class="form-group form-title">
-          <label for="mTitle">标题 <span class="required">*</span></label>
-          <div class="autofill-title-row">
-            <input type="text" id="mTitle" required autocomplete="off" />
-            <button class="btn-autofill" id="btnAutofill" type="button">
-              <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-              <span>一键填充</span>
-            </button>
+        <section class="form-section autofill-hero" aria-label="智能识别">
+          <div class="form-section-head">
+            <div>
+              <p class="form-section-kicker">Smart Fill</p>
+              <h3>先识别作品，再确认信息</h3>
+            </div>
+            <div class="form-group form-cat">
+              <label for="mCat">类别</label>
+              <select id="mCat">
+                <option value="music">音乐</option>
+                <option value="movie">电影</option>
+                <option value="tv">电视剧</option>
+                <option value="books">书籍</option>
+                <option value="images">图片</option>
+                <option value="articles">文章</option>
+              </select>
+            </div>
           </div>
-          <p class="autofill-status" id="autofillStatus" aria-live="polite">输入标题后可自动识别作者、描述、标签和年份。</p>
-        </div>
-        <div class="form-group form-artist">
-          <label for="mArtist">艺术家 / 作者 / 导演</label>
-          <input type="text" id="mArtist" autocomplete="off" />
-        </div>
-        <div class="form-group form-clue">
-          <label for="mClue">识别线索</label>
-          <input type="text" id="mClue" placeholder="如：韩国特工伪装成家庭 / 画着巨大海浪的日本版画" autocomplete="off" />
-        </div>
-        <div class="autofill-panel" id="autofillPanel" hidden></div>
-        <div class="form-group form-cover">
-          <label for="mCover">封面图片 URL</label>
-          <input type="url" id="mCover" placeholder="https://..." />
-        </div>
-        <div class="form-group form-desc">
-          <label for="mDesc">描述</label>
-          <input type="text" id="mDesc" autocomplete="off" />
-        </div>
-        <div class="form-group form-tags">
-          <label for="mTags">标签</label>
-          <input type="text" id="mTags" placeholder="科幻, 经典, 想重看" autocomplete="off" />
-        </div>
-        <div class="form-row">
+          <div class="form-group form-title">
+            <label for="mTitle">标题 <span class="required">*</span></label>
+            <div class="autofill-title-row">
+              <input type="text" id="mTitle" required autocomplete="off" />
+              <button class="btn-autofill" id="btnAutofill" type="button">
+                <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                <span>一键填充</span>
+              </button>
+            </div>
+            <p class="autofill-status" id="autofillStatus" aria-live="polite">输入标题或识别线索后可自动识别作者、描述、标签和年份。</p>
+          </div>
+          <div class="form-group form-clue">
+            <label for="mClue">识别线索</label>
+            <input type="text" id="mClue" placeholder="如：韩国特工伪装成家庭 / 画着巨大海浪的日本版画" autocomplete="off" />
+          </div>
+          <div class="autofill-panel" id="autofillPanel" hidden></div>
+        </section>
+        <section class="form-section manual-fields" aria-label="作品信息">
+          <div class="form-section-head">
+            <div>
+              <p class="form-section-kicker">Details</p>
+              <h3>确认后保存</h3>
+            </div>
+          </div>
+          <div class="form-group form-artist">
+            <label for="mArtist">艺术家 / 作者 / 导演</label>
+            <input type="text" id="mArtist" autocomplete="off" />
+          </div>
+          <div class="form-group form-cover">
+            <label for="mCover">封面图片 URL</label>
+            <input type="url" id="mCover" placeholder="https://..." />
+          </div>
+          <div class="form-group form-desc">
+            <label for="mDesc">描述</label>
+            <input type="text" id="mDesc" autocomplete="off" />
+          </div>
+          <div class="form-group form-tags">
+            <label for="mTags">标签</label>
+            <input type="text" id="mTags" placeholder="科幻, 经典, 想重看" autocomplete="off" />
+          </div>
           <div class="form-group">
             <label for="mYear">年份</label>
             <input type="text" id="mYear" maxlength="24" placeholder="如 1889 / 19世纪 / 约1830" />
@@ -219,11 +233,11 @@
             <label for="mRating">评分</label>
             <input type="number" id="mRating" min="1" max="5" value="4" inputmode="numeric" />
           </div>
-        </div>
-        <div class="form-group form-link">
-          <label for="mLink">链接</label>
-          <input type="url" id="mLink" placeholder="https://..." />
-        </div>
+          <div class="form-group form-link">
+            <label for="mLink">链接</label>
+            <input type="url" id="mLink" placeholder="https://..." />
+          </div>
+        </section>
         <button type="submit" class="btn-submit">保存</button>
       </form>
     </div>
