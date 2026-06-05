@@ -288,25 +288,28 @@
   function initRecentCollection() {
     var section = document.getElementById('recentCollection');
     var feature = document.getElementById('recentFeature');
+    var activity = document.getElementById('recentActivity');
     var filmstrip = document.getElementById('recentFilmstrip');
     if (!section || !feature || !filmstrip) return;
 
     feature.innerHTML = '<p class="collection-empty">正在读取最近收藏...</p>';
+    renderRecentActivityLoading(activity);
     filmstrip.innerHTML = '';
 
     loadRecentItemsFromRest()
       .then(function (items) {
-        renderRecentItems(feature, filmstrip, items);
+        renderRecentItems(feature, filmstrip, activity, items);
       })
       .catch(function (restError) {
         console.warn('Recent collection REST read failed:', restError);
         loadRecentItemsFromSdk()
           .then(function (items) {
-            renderRecentItems(feature, filmstrip, items);
+            renderRecentItems(feature, filmstrip, activity, items);
           })
           .catch(function (sdkError) {
             console.warn('Recent collection Firestore read failed:', sdkError);
             feature.innerHTML = '<p class="collection-empty">最近收藏加载失败：' + esc(getErrorMessage(restError || sdkError)) + '</p>';
+            renderRecentActivityError(activity);
           });
       });
   }
@@ -326,10 +329,13 @@
       });
   }
 
-  function renderRecentItems(feature, filmstrip, sourceItems) {
-    var items = sourceItems.sort(function (a, b) {
+  function renderRecentItems(feature, filmstrip, activity, sourceItems) {
+    var allItems = (sourceItems || []).slice();
+    var items = allItems.slice().sort(function (a, b) {
       return getItemTime(b.createdAt) - getItemTime(a.createdAt);
     }).slice(0, 8);
+
+    renderRecentActivity(activity, allItems);
 
     if (!items.length) {
       feature.innerHTML = '<p class="collection-empty">还没有最近收藏</p>';
@@ -339,6 +345,170 @@
 
     renderRecentFeature(feature, items[0]);
     renderRecentFilmstrip(filmstrip, items.slice(1));
+  }
+
+  function renderRecentActivityLoading(target) {
+    if (!target) return;
+    target.innerHTML = [
+      '<div class="activity-head">',
+      '<div>',
+      '<h3>收藏活跃图</h3>',
+      '<p>正在计算新增记录...</p>',
+      '</div>',
+      '</div>',
+      '<p class="collection-empty activity-empty">正在读取活跃记录...</p>'
+    ].join('');
+  }
+
+  function renderRecentActivityError(target) {
+    if (!target) return;
+    target.innerHTML = [
+      '<div class="activity-head">',
+      '<div>',
+      '<h3>收藏活跃图</h3>',
+      '<p>过去一年新增收藏</p>',
+      '</div>',
+      '</div>',
+      '<p class="collection-empty activity-empty">活跃图加载失败</p>'
+    ].join('');
+  }
+
+  function renderRecentActivity(target, sourceItems) {
+    if (!target) return;
+
+    var today = startOfLocalDay(new Date());
+    var end = new Date(today);
+    var rangeStart = new Date(today);
+    rangeStart.setFullYear(rangeStart.getFullYear() - 1);
+    rangeStart.setDate(rangeStart.getDate() + 1);
+
+    var gridStart = getMonday(rangeStart);
+    var dayCounts = {};
+    var total = 0;
+
+    (sourceItems || []).forEach(function (item) {
+      var date = getItemActivityDate(item);
+      if (!date || date < rangeStart || date > end) return;
+      var key = formatActivityKey(date);
+      dayCounts[key] = (dayCounts[key] || 0) + 1;
+      total += 1;
+    });
+
+    var days = [];
+    for (var cursor = new Date(gridStart); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+      var cellDate = new Date(cursor);
+      var inRange = cellDate >= rangeStart && cellDate <= end;
+      var count = inRange ? (dayCounts[formatActivityKey(cellDate)] || 0) : 0;
+      days.push({
+        date: cellDate,
+        count: count,
+        level: inRange ? getActivityLevel(count) : 0,
+        muted: !inRange
+      });
+    }
+
+    var weekCount = Math.ceil(days.length / 7);
+    var monthLabels = getActivityMonthLabels(days);
+    var cellColumns = 'repeat(' + weekCount + ', 10px)';
+
+    target.innerHTML = [
+      '<div class="activity-head">',
+      '<div>',
+      '<h3>收藏活跃图</h3>',
+      '<p>' + (total ? '过去一年新增 ' + total + ' 件收藏' : '过去一年还没有新增收藏') + '</p>',
+      '</div>',
+      '</div>',
+      '<div class="activity-scroll" tabindex="0" aria-label="过去一年新增收藏热力图">',
+      '<div class="activity-months" style="grid-template-columns: ' + escAttr(cellColumns) + ';">',
+      monthLabels.map(function (label) {
+        return '<span style="grid-column:' + label.week + ';">' + esc(label.text) + '</span>';
+      }).join(''),
+      '</div>',
+      '<div class="activity-body">',
+      '<div class="activity-weekdays" aria-hidden="true"><span></span><span>周一</span><span></span><span>周三</span><span></span><span>周五</span><span></span></div>',
+      '<div class="activity-grid" style="grid-template-columns: ' + escAttr(cellColumns) + ';">',
+      days.map(renderActivityCell).join(''),
+      '</div>',
+      '</div>',
+      '</div>',
+      '<div class="activity-foot">',
+      '<span>少</span>',
+      '<span class="activity-dot" data-level="0"></span>',
+      '<span class="activity-dot" data-level="1"></span>',
+      '<span class="activity-dot" data-level="2"></span>',
+      '<span class="activity-dot" data-level="3"></span>',
+      '<span class="activity-dot" data-level="4"></span>',
+      '<span>多</span>',
+      '</div>'
+    ].join('');
+
+    scrollActivityToLatest(target);
+  }
+
+  function scrollActivityToLatest(target) {
+    var scroller = target && target.querySelector('.activity-scroll');
+    if (!scroller) return;
+    window.requestAnimationFrame(function () {
+      scroller.scrollLeft = scroller.scrollWidth;
+    });
+  }
+
+  function renderActivityCell(day) {
+    var label = formatActivityKey(day.date) + '：新增 ' + day.count + ' 件收藏';
+    return [
+      '<span class="activity-cell' + (day.muted ? ' is-muted' : '') + '"',
+      ' data-level="' + day.level + '"',
+      ' title="' + escAttr(label) + '"',
+      ' aria-label="' + escAttr(label) + '"></span>'
+    ].join('');
+  }
+
+  function getItemActivityDate(item) {
+    var time = getItemTime(item && (item.createdAt || item.updatedAt));
+    if (!time) return null;
+    return startOfLocalDay(new Date(time));
+  }
+
+  function startOfLocalDay(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  function getMonday(date) {
+    var start = startOfLocalDay(date);
+    var day = start.getDay();
+    var offset = day === 0 ? -6 : 1 - day;
+    start.setDate(start.getDate() + offset);
+    return start;
+  }
+
+  function formatActivityKey(date) {
+    var year = date.getFullYear();
+    var month = String(date.getMonth() + 1).padStart(2, '0');
+    var day = String(date.getDate()).padStart(2, '0');
+    return year + '-' + month + '-' + day;
+  }
+
+  function getActivityLevel(count) {
+    if (count >= 4) return 4;
+    if (count >= 3) return 3;
+    if (count >= 2) return 2;
+    if (count >= 1) return 1;
+    return 0;
+  }
+
+  function getActivityMonthLabels(days) {
+    var labels = [];
+    var seen = {};
+    days.forEach(function (day, index) {
+      var monthKey = day.date.getFullYear() + '-' + day.date.getMonth();
+      if (seen[monthKey] || day.date.getDate() > 7) return;
+      seen[monthKey] = true;
+      labels.push({
+        week: Math.floor(index / 7) + 1,
+        text: (day.date.getMonth() + 1) + '月'
+      });
+    });
+    return labels;
   }
 
   function loadRecentItemsFromRest() {

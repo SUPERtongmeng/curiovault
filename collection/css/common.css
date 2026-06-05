@@ -819,12 +819,26 @@ body.page-leaving::before {
   letter-spacing: 0;
 }
 
+.recent-topline {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.95fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.recent-feature {
+  display: flex;
+  min-width: 0;
+}
+
 .recent-feature-card {
   display: grid;
   grid-template-columns: 136px minmax(0, 1fr);
   gap: 20px;
   align-items: center;
   box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   min-height: 176px;
   padding: 20px;
   overflow: hidden;
@@ -837,6 +851,170 @@ body.page-leaving::before {
   backdrop-filter: blur(20px) saturate(1.25);
   -webkit-backdrop-filter: blur(20px) saturate(1.25);
   transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+}
+
+.recent-activity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 176px;
+  box-sizing: border-box;
+  padding: 18px 18px 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.075);
+  color: #fff;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
+}
+
+.recent-activity:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.105);
+  box-shadow: 0 28px 88px rgba(0, 0, 0, 0.24);
+}
+
+.activity-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.activity-head h3 {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 1rem;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.activity-head p {
+  margin: 4px 0 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.activity-scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.activity-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.activity-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.activity-months {
+  display: grid;
+  gap: 4px;
+  margin-left: 34px;
+  margin-bottom: 5px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+.activity-months span {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.activity-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.activity-weekdays {
+  display: grid;
+  flex: 0 0 26px;
+  grid-template-rows: repeat(7, 10px);
+  gap: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.62rem;
+  line-height: 10px;
+  text-align: right;
+}
+
+.activity-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 10px);
+  gap: 4px;
+}
+
+.activity-cell,
+.activity-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.075);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+.activity-cell {
+  display: block;
+}
+
+.activity-cell.is-muted {
+  opacity: 0.42;
+}
+
+.activity-cell[data-level="1"],
+.activity-dot[data-level="1"] {
+  background: rgba(196, 122, 10, 0.72);
+}
+
+.activity-cell[data-level="2"],
+.activity-dot[data-level="2"] {
+  background: rgba(237, 146, 15, 0.82);
+}
+
+.activity-cell[data-level="3"],
+.activity-dot[data-level="3"] {
+  background: rgba(245, 184, 74, 0.94);
+}
+
+.activity-cell[data-level="4"],
+.activity-dot[data-level="4"] {
+  background: var(--accent-light);
+  box-shadow: 0 0 12px rgba(237, 146, 15, 0.3);
+}
+
+.activity-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: auto;
+  padding-top: 8px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.68rem;
+}
+
+.activity-empty {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 76px;
+  margin: 0;
 }
 
 .recent-feature-card:hover {
@@ -1072,6 +1250,16 @@ body.page-leaving::before {
 
   .recent-strip-item:hover::before {
     height: 58px;
+  }
+}
+
+@media (max-width: 900px) {
+  .recent-topline {
+    grid-template-columns: 1fr;
+  }
+
+  .recent-activity {
+    min-height: 170px;
   }
 }
 
