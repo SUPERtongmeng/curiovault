@@ -441,7 +441,7 @@ function readFormData() {
   }
 
   if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
-    alert('评分需要在 1 到 5 之间');
+    alert('推荐程度需要在 1 到 5 之间');
     return null;
   }
 
@@ -841,7 +841,7 @@ function renderTable() {
       '<td data-label="标题"><div class="td-title"><span class="td-title-main">' + esc(title) + '</span><span class="td-title-sub">' + esc(description) + '</span>' + tagsHtml + '</div></td>',
       '<td data-label="类别"><span class="td-cat">' + esc(catLabel) + '</span></td>',
       '<td data-label="年份">' + esc(item.year || '-') + '</td>',
-      '<td data-label="评分"><span class="td-stars">' + buildStars(item.rating) + '</span></td>',
+      '<td data-label="推荐"><span class="td-stars">' + buildStars(item.rating) + '</span></td>',
       '<td data-label="添加时间" class="td-time">' + esc(formatDate(item.createdAt)) + '</td>',
       '<td data-label="操作"><div class="actions">',
       '<button class="btn-action" type="button" data-edit="' + escAttr(item.id) + '" title="编辑" aria-label="编辑 ' + escAttr(title) + '"><i class="fa-solid fa-pen" aria-hidden="true"></i></button>',

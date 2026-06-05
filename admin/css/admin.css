@@ -1540,7 +1540,7 @@ form {
 
   .data-table td[data-label="类别"],
   .data-table td[data-label="年份"],
-  .data-table td[data-label="评分"],
+  .data-table td[data-label="推荐"],
   .data-table td[data-label="添加时间"] {
     grid-column: 2;
   }
@@ -1576,7 +1576,7 @@ form {
   body.bulk-mode .data-table td[data-label="标题"],
   body.bulk-mode .data-table td[data-label="类别"],
   body.bulk-mode .data-table td[data-label="年份"],
-  body.bulk-mode .data-table td[data-label="评分"],
+  body.bulk-mode .data-table td[data-label="推荐"],
   body.bulk-mode .data-table td[data-label="添加时间"] {
     grid-column: 3;
   }
