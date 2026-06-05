@@ -10,6 +10,7 @@ const {
   createMusicCandidateFallback,
   createFallbackModelResult,
   normalizeNetEaseSongCandidates,
+  normalizeExcludedCandidates,
   normalizeOriginalArtistName,
   normalizeModelResult,
   normalizeRequest,
@@ -108,6 +109,36 @@ const tests = [
     }
   },
   {
+    name: 'excluded candidates are omitted from next batch',
+    run() {
+      const request = normalizeRequest({
+        category: 'music',
+        title: 'Hero',
+        excludedCandidates: [
+          { title: 'Hero', artist: 'Mariah Carey', year: '1993' },
+          { title: 'Hero', artist: 'Enrique Iglesias', year: '2001' }
+        ],
+        current: {}
+      });
+      assert.equal(normalizeExcludedCandidates(request.excludedCandidates).length, 2);
+      const result = normalizeModelResult(parseModelJson(JSON.stringify({
+        item: { title: 'Hero', artist: 'Mariah Carey', year: '1993', tags: ['流行'], needsMoreContext: false },
+        candidates: [
+          { title: 'Hero', artist: 'Mariah Carey', year: '1993' },
+          { title: 'Hero', artist: 'Enrique Iglesias', year: '2001' },
+          { title: 'Hero', artist: 'Chad Kroeger', year: '2002' },
+          { title: 'Hero', artist: 'Family of the Year', year: '2012' }
+        ],
+        needsMoreContext: true
+      })), request);
+      assert.equal(result.item.artist, '');
+      assert.equal(result.item.needsMoreContext, true);
+      assert.equal(result.candidates.length, 2);
+      assert.equal(result.candidates[0].artist, 'Chad Kroeger');
+      assert.equal(result.candidates[1].artist, 'Family of the Year');
+    }
+  },
+  {
     name: 'system prompt requires original artist names',
     run() {
       const prompt = buildSystemPrompt();
@@ -130,6 +161,8 @@ const tests = [
       assert.match(prompt, /同名且不确定时返回 needsMoreContext=true，并给 candidates 2-3 项/);
       assert.match(prompt, /例如 Hero、Lemon、Stay/);
       assert.match(prompt, /最多 3 个最可能的歌曲 candidates/);
+      assert.match(prompt, /excludedCandidates/);
+      assert.match(prompt, /不要重复返回/);
     }
   },
   {
@@ -144,6 +177,7 @@ const tests = [
       assert.match(prompt, /禁止返回中文音译名/);
       assert.match(prompt, /音乐短标题或同名作品/);
       assert.match(prompt, /最多 3 个候选 candidates/);
+      assert.match(prompt, /不要把这些已排除候选修回 item 或 candidates/);
       assert.match(prompt, /无法可靠确认原文写法时才使用国际通用名/);
     }
   },

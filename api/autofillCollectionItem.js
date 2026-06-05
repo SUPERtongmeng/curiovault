@@ -83,7 +83,7 @@ async function handler(req, res) {
     });
     const result = normalizeModelResult(parsed, input);
     if (input.category === 'music' && input.musicCandidates.length && !result.candidates.length) {
-      result.candidates = input.musicCandidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData).slice(0, MAX_CANDIDATES);
+      result.candidates = filterExcludedCandidates(input.musicCandidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData), input).slice(0, MAX_CANDIDATES);
     }
     res.status(200).json(result);
   } catch (error) {
@@ -110,6 +110,7 @@ module.exports.__test = {
   getPublicErrorMessage,
   extractJsonObject,
   normalizeNetEaseSongCandidates,
+  normalizeExcludedCandidates,
   normalizeOriginalArtistName,
   normalizeModelResult,
   normalizeRequest,
@@ -134,6 +135,7 @@ function normalizeRequest(body) {
     title: cleanString(body.title).slice(0, 120),
     artist: cleanString(body.artist).slice(0, 120),
     clue: cleanString(body.clue).slice(0, 300),
+    excludedCandidates: normalizeExcludedCandidates(body.excludedCandidates),
     current: {
       description: cleanString(body.current && body.current.description).slice(0, 180),
       tags: normalizeTags(body.current && body.current.tags),
@@ -149,6 +151,7 @@ function buildSystemPrompt() {
     '根据 category/title/artist/clue 识别作品；artist 有值时只作为识别作品的强约束，不代表输出 artist 可以照抄输入。',
     'clue 是用户输入的识别线索，可能是抽象描述、剧情、画面、主题或记忆片段；它只用于识别作品，不是最终 description，不要直接复制 clue 作为 description。',
     '当 category=music 且输入里有 musicCandidates 时，只能从 musicCandidates 中选择最匹配歌曲；可生成中文 description 和 tags，但 title/artist/year/coverUrl/link 必须优先使用候选原始字段。',
+    '如果输入里有 excludedCandidates，说明这些候选已展示过但用户不满意；新的 item/candidates 必须避开 excludedCandidates，不要重复返回。',
     '同名且不确定时返回 needsMoreContext=true，并给 candidates 2-3 项；不要强行确定。category=music 且 title 很短或常见（例如 Hero、Lemon、Stay）时，如果没有 musicCandidates，也必须根据常识返回最多 3 个最可能的歌曲 candidates 供用户选择，不要返回空结果。',
     '不要编造；不确定字段用空字符串或空数组。',
     'artist 字段按分类填写：音乐填歌手/艺术家；电影填导演；电视剧填主创/导演/编剧中最常用的负责人；书籍填作者；图片填艺术家/摄影师/创作者；文章填作者。能可靠确认时必须填写。电视剧不要填角色名或演员名，例如 东京爱情故事 不要返回 永尾完治，要返回 坂元裕二。',
@@ -165,6 +168,7 @@ function buildRepairPrompt(rawText, input) {
     '把下面模型输出修复为一个合法 JSON 对象，只返回一行 JSON，不要解释。',
     '必须使用双引号；数组元素之间必须有逗号；不要 Markdown；不要 <think>。',
     '如果原文没有可靠作品信息，根据输入的 title 或 clue 生成 needsMoreContext=true 的 JSON。',
+    '如果输入里有 excludedCandidates，不要把这些已排除候选修回 item 或 candidates。',
     '如果是音乐短标题或同名作品，必须保留或生成最多 3 个候选 candidates，不要修成空 candidates。',
     '保留 title 语言规则：非中文原名用“原始标题（中文翻译）”，中文原名只保留中文；artist 优先使用创作者/团体的原文写法，不要默认翻译成中文，也不要优先改成英文罗马字；如果 artist 是中文译名或简体名，必须尽量校正为原文写法；拉丁字母姓名必须返回拉丁原名，禁止返回中文音译名；无法可靠确认原文写法时才使用国际通用名。',
     'artist 字段按分类填写：音乐=歌手/艺术家，电影=导演，电视剧=主创/导演/编剧，书籍=作者，图片=艺术家/摄影师，文章=作者。',
@@ -592,14 +596,15 @@ function softRepairJsonText(text) {
 function normalizeModelResult(data, input) {
   const safeData = data && typeof data === 'object' ? data : createFallbackModelResult(input);
   const item = normalizeItem(safeData.item || safeData.result || safeData, input);
+  const safeItem = isExcludedCandidate(item, input) ? createFallbackModelResult(input).item : item;
   const candidates = Array.isArray(safeData.candidates)
-    ? safeData.candidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData).slice(0, MAX_CANDIDATES)
+    ? filterExcludedCandidates(safeData.candidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData), input).slice(0, MAX_CANDIDATES)
     : [];
 
   return {
-    item,
+    item: safeItem,
     candidates,
-    needsMoreContext: Boolean(safeData.needsMoreContext || item.needsMoreContext)
+    needsMoreContext: Boolean(safeData.needsMoreContext || safeItem.needsMoreContext)
   };
 }
 
@@ -623,7 +628,7 @@ function createFallbackModelResult(input) {
 
 function createMusicCandidateFallback(input) {
   const candidates = Array.isArray(input && input.musicCandidates)
-    ? input.musicCandidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData).slice(0, MAX_CANDIDATES)
+    ? filterExcludedCandidates(input.musicCandidates.map((candidate) => normalizeItem(candidate, input)).filter(hasCandidateData), input).slice(0, MAX_CANDIDATES)
     : [];
   return {
     item: candidates[0] || createFallbackModelResult(input).item,
@@ -659,6 +664,41 @@ function normalizeOriginalArtistName(value, title, category) {
 
 function hasCandidateData(item) {
   return Boolean(item.title || item.artist || item.description || item.year || item.coverUrl || item.link || item.tags.length);
+}
+
+function filterExcludedCandidates(candidates, input) {
+  const excluded = new Set((input && input.excludedCandidates || []).map(candidateKey).filter(Boolean));
+  if (!excluded.size) return candidates;
+  return candidates.filter((candidate) => !excluded.has(candidateKey(candidate)));
+}
+
+function isExcludedCandidate(candidate, input) {
+  const key = candidateKey(candidate);
+  if (!key) return false;
+  return (input && input.excludedCandidates || []).map(candidateKey).indexOf(key) !== -1;
+}
+
+function normalizeExcludedCandidates(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => {
+    if (typeof item === 'string') return cleanString(item).slice(0, 260);
+    if (!item || typeof item !== 'object') return '';
+    return {
+      title: cleanString(item.title).slice(0, 120),
+      artist: cleanString(item.artist).slice(0, 120),
+      year: cleanString(item.year).slice(0, 24)
+    };
+  }).filter(Boolean).slice(0, 12);
+}
+
+function candidateKey(item) {
+  if (typeof item === 'string') return cleanString(item).toLowerCase();
+  if (!item || typeof item !== 'object') return '';
+  return [
+    cleanString(item.title).toLowerCase(),
+    cleanString(item.artist).toLowerCase(),
+    cleanString(item.year).toLowerCase()
+  ].join('|');
 }
 
 function normalizeTags(value) {

@@ -44,6 +44,7 @@ var btnAutofill = document.getElementById('btnAutofill');
 var autofillStatus = document.getElementById('autofillStatus');
 var autofillPanel = document.getElementById('autofillPanel');
 var autofillCandidates = [];
+var autofillExcludedCandidates = [];
 
 document.querySelectorAll('.cat-tab').forEach(function (tab) {
   tab.addEventListener('click', function () {
@@ -508,6 +509,16 @@ function editItem(id) {
 }
 
 function handleAutofill() {
+  autofillExcludedCandidates = [];
+  requestAutofill(false);
+}
+
+function handleAutofillMore() {
+  autofillExcludedCandidates = autofillExcludedCandidates.concat(autofillCandidates.map(getAutofillCandidateKey));
+  requestAutofill(true);
+}
+
+function requestAutofill(isMore) {
   var title = document.getElementById('mTitle').value.trim();
   var artist = document.getElementById('mArtist').value.trim();
   var clueInput = document.getElementById('mClue');
@@ -532,7 +543,7 @@ function handleAutofill() {
   }
 
   setAutofillLoading(true);
-  setAutofillStatus('', getAutofillLoadingMessage(title, artist, clue));
+  setAutofillStatus('', isMore ? '正在换一批候选...' : getAutofillLoadingMessage(title, artist, clue));
   hideAutofillPanel();
 
   fetch(endpoint, {
@@ -543,6 +554,7 @@ function handleAutofill() {
       title: title,
       artist: artist,
       clue: clue,
+      excludedCandidates: autofillExcludedCandidates,
       current: {
         description: document.getElementById('mDesc').value.trim(),
         tags: parseTags(document.getElementById('mTags').value),
@@ -665,7 +677,8 @@ function renderAutofillCandidates(candidates) {
         '<button class="autofill-apply" type="button" data-autofill-index="' + index + '">应用</button>',
         '</div>'
       ].join('');
-    }).join('')
+    }).join(''),
+    '<button class="autofill-more" type="button" data-autofill-more="true"><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i><span>换一批</span></button>'
   ].join('');
 
   autofillPanel.querySelectorAll('[data-autofill-index]').forEach(function (button) {
@@ -676,6 +689,19 @@ function renderAutofillCandidates(candidates) {
       setAutofillStatus('ok', '已应用候选信息。已填写的内容不会被覆盖。');
     });
   });
+
+  var moreButton = autofillPanel.querySelector('[data-autofill-more]');
+  if (moreButton) {
+    moreButton.addEventListener('click', handleAutofillMore);
+  }
+}
+
+function getAutofillCandidateKey(item) {
+  return {
+    title: cleanString(item && item.title),
+    artist: cleanString(item && item.artist),
+    year: cleanString(item && item.year)
+  };
 }
 
 function applyAutofillData(item) {
@@ -757,6 +783,7 @@ function setAutofillStatus(type, message) {
 
 function resetAutofillUi() {
   autofillCandidates = [];
+  autofillExcludedCandidates = [];
   hideAutofillPanel();
   setAutofillLoading(false);
   setAutofillStatus('', '输入标题或识别线索后可自动识别作者、描述、标签和年份。');
