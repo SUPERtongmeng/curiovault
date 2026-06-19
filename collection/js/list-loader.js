@@ -1,4 +1,4 @@
-// Shared Firestore data layer and page-specific renderers.
+﻿// Shared Firestore data layer and page-specific renderers.
 (function () {
   var CATEGORY_LABELS = {
     music: '音乐',
@@ -105,27 +105,99 @@
       return;
     }
 
-    var first = items[0];
-    feature.innerHTML = [
-      '<div class="music-spot-cover">' + coverImg(first) + '</div>',
-      '<div class="music-spot-info">',
-      '<span class="page-kicker">Now In Library</span>',
-      '<h1>' + esc(first.title || '未命名音乐') + '</h1>',
-      '<p>' + esc(first.artist || first.description || '未填写艺术家') + '</p>',
-      '<span class="page-rating">' + stars(first.rating) + '</span>',
-      '</div>'
-    ].join('');
+    var selectedIndex = 0;
+
+    function renderSelectedMusic(item) {
+      feature.innerHTML = [
+        '<div class="music-player-cover">' + coverImg(item) + '</div>',
+        '<div class="music-player-meta">',
+        '<h1>' + esc(item.title || '未命名音乐') + '</h1>',
+        '<p>' + esc(item.artist || item.description || '未填写艺术家') + '</p>',
+        '</div>',
+        '<div class="music-player-controls" aria-label="音乐控制">',
+        '<button class="music-panel-btn" type="button" data-music-action="prev" aria-label="上一首"><i class="fa-solid fa-backward-step"></i></button>',
+        '<button class="music-panel-btn music-panel-play" type="button" aria-label="播放"><i class="fa-solid fa-play"></i></button>',
+        '<button class="music-panel-btn" type="button" data-music-action="next" aria-label="下一首"><i class="fa-solid fa-forward-step"></i></button>',
+        '</div>',
+        '<div class="music-player-progress" aria-hidden="true"><span></span></div>'
+      ].join('');
+    }
+
+    function applyDistances(centerIndex) {
+      queue.querySelectorAll('.music-track').forEach(function (track) {
+        var dist = Math.abs(Number(track.dataset.index) - centerIndex);
+        track.classList.toggle('is-active', dist === 0);
+        track.style.setProperty('--dist', dist);
+      });
+    }
+
+    function setSelected(index) {
+      selectedIndex = Math.max(0, Math.min(items.length - 1, index));
+
+      /* Instant blur -> paint -> swap -> smooth unblur */
+      var content = document.getElementById('musicPlayerContent');
+      if (content) {
+        content.classList.add('switching');
+        content.offsetHeight; /* force paint */
+      }
+
+      requestAnimationFrame(function () {
+        renderSelectedMusic(items[selectedIndex]);
+        updateMusicPalette(items[selectedIndex]);
+        applyDistances(selectedIndex);
+
+        content = document.getElementById('musicPlayerContent');
+        if (content) {
+          requestAnimationFrame(function () {
+            content.classList.remove('switching');
+          });
+        }
+      });
+    }
 
     queue.innerHTML = items.map(function (item, index) {
       return [
-        '<article class="music-track">',
-        '<span class="track-index">' + pad(index + 1) + '</span>',
+        '<article class="music-track' + (index === 0 ? ' is-active' : '') + '" role="button" tabindex="0" data-index="' + index + '">',
         '<div class="track-cover">' + coverImg(item) + '</div>',
         '<div class="track-info"><strong>' + esc(item.title || '未命名音乐') + '</strong><span>' + esc(item.artist || item.year || '') + '</span></div>',
-        '<span class="track-rating">' + stars(item.rating) + '</span>',
         '</article>'
       ].join('');
     }).join('');
+
+    queue.querySelectorAll('.music-track').forEach(function (track) {
+      track.addEventListener('click', function () {
+        setSelected(Number(track.dataset.index) || 0);
+      });
+      track.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        setSelected(Number(track.dataset.index) || 0);
+      });
+      track.addEventListener('mouseenter', function () {
+        applyDistances(Number(track.dataset.index) || 0);
+      });
+    });
+
+    queue.addEventListener('mouseleave', function () {
+      applyDistances(selectedIndex);
+    });
+
+    feature.addEventListener('click', function (event) {
+      var action = event.target.closest('[data-music-action]');
+      if (!action) return;
+      if (action.dataset.musicAction === 'prev') setSelected(selectedIndex - 1);
+      if (action.dataset.musicAction === 'next') setSelected(selectedIndex + 1);
+    });
+
+    setSelected(0);
+  }
+
+  function updateMusicPalette(item) {
+    if (window.updateMusicFluidPalette) {
+      window.updateMusicFluidPalette(item);
+      return;
+    }
+    document.dispatchEvent(new CustomEvent('music:coverchange', { detail: item }));
   }
 
   function renderFilm(items) {

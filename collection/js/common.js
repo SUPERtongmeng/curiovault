@@ -1,6 +1,5 @@
-// Shared front-end shell: navigation, theme, mobile menu, and home background.
+﻿// Shared front-end shell: navigation, mobile menu, and home background.
 (function () {
-  var STORAGE_KEY = 'xiao-xi-theme';
   var CATEGORY_LABELS = {
     music: '音乐',
     movie: '电影',
@@ -18,7 +17,7 @@
     { href: 'articles.html', label: '文章', icon: 'fa-newspaper' }
   ];
 
-  applySavedTheme();
+  applyDefaultTheme();
   renderSiteNav();
   bindNavbar();
   bindPageTransitions();
@@ -28,10 +27,11 @@
   initCategoryShowcase();
   initRecentCollection();
   initMusicPlayer();
+  initMusicFluidBackground();
 
-  function applySavedTheme() {
-    var saved = localStorage.getItem(STORAGE_KEY);
-    document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+  function applyDefaultTheme() {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.removeItem('xiao-xi-theme');
   }
 
   function renderSiteNav() {
@@ -46,28 +46,11 @@
 
     mount.innerHTML = [
       '<nav id="navbar">',
+      '<div class="nav-pill">',
       '<a href="index.html" class="nav-brand">Xiao Xi</a>',
       '<ul class="nav-links" id="navbarNav">' + links + '</ul>',
+      '</div>',
       '<div class="nav-actions">',
-      '<button class="theme-toggle" id="themeToggle" aria-label="切换主题">',
-      '<svg class="sun-and-moon" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24">',
-      '<circle class="sun" cx="12" cy="12" r="6" mask="url(#moon-mask)" fill="currentColor" />',
-      '<g class="sun-beams" stroke="currentColor">',
-      '<line x1="12" y1="1" x2="12" y2="3" />',
-      '<line x1="12" y1="21" x2="12" y2="23" />',
-      '<line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />',
-      '<line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />',
-      '<line x1="1" y1="12" x2="3" y2="12" />',
-      '<line x1="21" y1="12" x2="23" y2="12" />',
-      '<line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />',
-      '<line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />',
-      '</g>',
-      '<mask class="moon" id="moon-mask">',
-      '<rect x="0" y="0" width="100%" height="100%" fill="white" />',
-      '<circle cx="24" cy="10" r="6" fill="black" />',
-      '</mask>',
-      '</svg>',
-      '</button>',
       '<button class="hamburger" id="menuToggle" aria-label="菜单">',
       '<span class="hamburger-line"></span>',
       '<span class="hamburger-line"></span>',
@@ -80,7 +63,6 @@
 
   function bindNavbar() {
     var navbar = document.getElementById('navbar');
-    var themeToggle = document.getElementById('themeToggle');
     var menuToggle = document.getElementById('menuToggle');
     var navbarNav = document.getElementById('navbarNav');
 
@@ -90,14 +72,6 @@
       });
     }
 
-    if (themeToggle) {
-      themeToggle.addEventListener('click', function () {
-        var html = document.documentElement;
-        var next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-        html.setAttribute('data-theme', next);
-        localStorage.setItem(STORAGE_KEY, next);
-      });
-    }
 
     if (menuToggle && navbarNav) {
       menuToggle.addEventListener('click', function () {
@@ -910,6 +884,138 @@
     });
   }
 
+  /* ── Album-cover fluid background (amll-style, double-buffer) ── */
+  function initMusicFluidBackground() {
+    var body = document.body;
+    if (!body || !body.classList.contains('page-music')) return;
+
+    var layerA = document.getElementById('musicFluidLayerA');
+    var layerB = document.getElementById('musicFluidLayerB');
+    if (!layerA || !layerB) return;
+
+    var activeLayer = layerA;
+    var requestId = 0;
+
+    /* ── Public API ── */
+    window.updateMusicFluidPalette = function (item) {
+      var src = item && typeof item.coverUrl === 'string' ? item.coverUrl.trim() : '';
+      requestId += 1;
+      var current = requestId;
+
+      if (!src) { clearFluidOrbs(); return; }
+
+      /* Pick the inactive layer to receive new cover */
+      var incoming = (activeLayer === layerA) ? layerB : layerA;
+      var outgoing = activeLayer;
+
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+      function applyCover() {
+        if (current !== requestId) return;
+        /* Set new background on incoming orbs */
+        var orbs = incoming.querySelectorAll('.fluid-orb');
+        orbs.forEach(function (orb) {
+          orb.style.backgroundImage = 'url(' + escAttr(src) + ')';
+        });
+        incoming.offsetHeight;
+        orbs.forEach(function (orb) { orb.classList.add('loaded'); });
+
+        /* Fade out old layer */
+        var oldOrbs = outgoing.querySelectorAll('.fluid-orb');
+        oldOrbs.forEach(function (orb) { orb.classList.remove('loaded'); });
+
+        /* Swap active */
+        activeLayer = incoming;
+      }
+      img.onload = applyCover;
+      img.onerror = function () {
+        if (current === requestId) clearFluidOrbs();
+      };
+      img.src = src;
+      if (img.complete) applyCover();
+
+      /* Extract dominant colour for page background */
+      extractCoverPalette(src).then(function (palette) {
+        if (current !== requestId) return;
+        var base = palette.base || tintMusicColor(palette.colors[0]);
+        body.style.setProperty('--music-fluid-base', rgbString(base));
+      }).catch(function () {});
+    };
+
+    document.addEventListener('music:coverchange', function (event) {
+      window.updateMusicFluidPalette(event.detail || {});
+    });
+  }
+
+  function clearFluidOrbs() {
+    document.querySelectorAll('.fluid-orb').forEach(function (orb) {
+      orb.style.backgroundImage = '';
+      orb.classList.remove('loaded');
+    });
+    var body = document.body;
+    if (body) body.style.setProperty('--music-fluid-base', '#f8f3ff');
+  }
+
+  /* ── Cover palette extraction (reused for base colour) ── */
+  function extractCoverPalette(src) {
+    return new Promise(function (resolve, reject) {
+      var image = new Image();
+      image.crossOrigin = 'anonymous';
+      image.decoding = 'async';
+      image.onload = function () {
+        try {
+          var canvas = document.createElement('canvas');
+          var size = 48;
+          canvas.width = size;
+          canvas.height = size;
+          var ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(image, 0, 0, size, size);
+          resolve(buildPaletteFromPixels(ctx.getImageData(0, 0, size, size).data));
+        } catch (e) { reject(e); }
+      };
+      image.onerror = reject;
+      image.src = src;
+    });
+  }
+
+  function buildPaletteFromPixels(data) {
+    var buckets = [];
+    for (var i = 0; i < data.length; i += 16) {
+      var r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+      if (a < 160) continue;
+      var max = Math.max(r, g, b), min = Math.min(r, g, b);
+      var sat = max === 0 ? 0 : (max - min) / max;
+      var bri = (r + g + b) / 3;
+      if (bri < 32 || bri > 238 || sat < 0.12) continue;
+      buckets.push({ rgb: boostMusicColor([r, g, b]), score: sat * 90 + Math.abs(bri - 150) * -0.12 + max * 0.08 });
+    }
+    buckets.sort(function (a, b) { return b.score - a.score; });
+    var colors = [];
+    buckets.forEach(function (b) {
+      if (colors.length >= 4) return;
+      if (colors.every(function (c) { return colorDistance(c, b.rgb) > 62; })) colors.push(b.rgb);
+    });
+    if (colors.length === 0) throw new Error('No usable cover colours');
+    while (colors.length < 4) colors.push(deriveCoverColor(colors[0], colors.length));
+    return { colors: colors, base: tintMusicColor(colors[0]) };
+  }
+
+  function boostMusicColor(rgb) {
+    return rgb.map(function (v) { return Math.max(30, Math.min(248, Math.round(v * 0.86 + 36))); });
+  }
+  function tintMusicColor(rgb) {
+    return rgb.map(function (v) { return Math.round(v * 0.38 + 255 * 0.62); });
+  }
+  function colorDistance(a, b) {
+    var dr = a[0] - b[0], dg = a[1] - b[1], db = a[2] - b[2];
+    return Math.sqrt(dr * dr + dg * dg + db * db);
+  }
+  function deriveCoverColor(rgb, index) {
+    var mixes = [[255, 255, 255, 0.24], [0, 0, 0, 0.18], [255 - rgb[0], 255 - rgb[1], 255 - rgb[2], 0.16]];
+    var mix = mixes[(index - 1) % mixes.length];
+    return rgb.map(function (v, i) { return Math.max(24, Math.min(255, Math.round(v * (1 - mix[3]) + mix[i] * mix[3]))); });
+  }
+  function rgbString(rgb) { return 'rgb(' + rgb.join(', ') + ')'; }
   function initMusicPlayer() {
     var playBtn = document.querySelector('.music-play');
     var coverImg = document.querySelector('.music-cover img');
