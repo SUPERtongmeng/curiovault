@@ -43,6 +43,7 @@ var healthFrontendMsg = document.getElementById('healthFrontendMsg');
 var btnAutofill = document.getElementById('btnAutofill');
 var autofillStatus = document.getElementById('autofillStatus');
 var autofillPanel = document.getElementById('autofillPanel');
+var durationGroup = document.getElementById('durationGroup');
 var autofillCandidates = [];
 var autofillExcludedCandidates = [];
 
@@ -104,6 +105,8 @@ if (btnAutofill) {
   btnAutofill.addEventListener('click', handleAutofill);
 }
 
+document.getElementById('mCat').addEventListener('change', syncMusicFields);
+
 document.getElementById('btnAdd').addEventListener('click', function () {
   editingId = null;
   modalTitle.textContent = '添加作品';
@@ -111,6 +114,7 @@ document.getElementById('btnAdd').addEventListener('click', function () {
   submitBtn.disabled = false;
   modalForm.reset();
   document.getElementById('mCat').value = currentCat || 'music';
+  syncMusicFields();
   document.getElementById('mRating').value = '4';
   resetAutofillUi();
   openModal();
@@ -169,6 +173,7 @@ document.getElementById('btnExport').addEventListener('click', function () {
       description: item.description || '',
       link: item.link || '',
       year: item.year || null,
+      duration: item.duration || null,
       rating: item.rating || 4,
       tags: normalizeTags(item.tags),
       createdAt: timestampToDate(item.createdAt) ? timestampToDate(item.createdAt).toISOString() : null,
@@ -312,6 +317,7 @@ function importItems(importedItems) {
       description: item.description || '',
       link: item.link || '',
       year: normalizeYear(item.year),
+      duration: item.category === 'music' ? normalizeDuration(item.duration) : null,
       rating: clampRating(item.rating),
       tags: normalizeTags(item.tags),
       createdAt: normalizeImportDate(item.createdAt) || now,
@@ -350,6 +356,7 @@ function normalizeDoc(doc) {
     description: data.description || '',
     link: data.link || '',
     year: data.year || null,
+    duration: data.duration || null,
     rating: data.rating || 4,
     tags: normalizeTags(data.tags),
     createdAt: data.createdAt || null,
@@ -368,6 +375,7 @@ function normalizeRestDoc(doc) {
     description: data.description || '',
     link: data.link || '',
     year: data.year || null,
+    duration: data.duration || null,
     rating: data.rating || 4,
     tags: normalizeTags(data.tags),
     createdAt: data.createdAt || null,
@@ -429,6 +437,7 @@ function readFormData() {
   var year = normalizeYear(document.getElementById('mYear').value);
   var title = document.getElementById('mTitle').value.trim();
   var category = document.getElementById('mCat').value;
+  var duration = category === 'music' ? normalizeDuration(document.getElementById('mDuration').value) : null;
 
   if (!title) {
     alert('请填写标题');
@@ -450,6 +459,11 @@ function readFormData() {
     return null;
   }
 
+  if (duration && duration.length > 24) {
+    alert('音乐时长请控制在 24 个字符以内');
+    return null;
+  }
+
   return {
     category: category,
     title: title,
@@ -459,6 +473,7 @@ function readFormData() {
     link: document.getElementById('mLink').value.trim(),
     tags: parseTags(document.getElementById('mTags').value),
     year: year,
+    duration: duration,
     rating: rating
   };
 }
@@ -467,6 +482,12 @@ function normalizeYear(value) {
   if (value === null || value === undefined) return null;
   var year = String(value).trim();
   return year || null;
+}
+
+function normalizeDuration(value) {
+  if (value === null || value === undefined) return null;
+  var duration = String(value).trim();
+  return duration || null;
 }
 
 function cleanString(value) {
@@ -485,6 +506,12 @@ function closeModal() {
   modal.setAttribute('aria-hidden', 'true');
 }
 
+function syncMusicFields() {
+  var isMusic = document.getElementById('mCat').value === 'music';
+  if (durationGroup) durationGroup.hidden = !isMusic;
+  if (!isMusic) document.getElementById('mDuration').value = '';
+}
+
 function editItem(id) {
   var item = allItems.find(function (entry) { return entry.id === id; });
   if (!item) return;
@@ -501,6 +528,8 @@ function editItem(id) {
   document.getElementById('mTags').value = normalizeTags(item.tags).join(', ');
   document.getElementById('mLink').value = item.link || '';
   document.getElementById('mYear').value = item.year || '';
+  document.getElementById('mDuration').value = item.duration || '';
+  syncMusicFields();
   document.getElementById('mRating').value = item.rating || 4;
   submitBtn.textContent = '保存到 Firestore';
   submitBtn.disabled = false;
@@ -558,7 +587,8 @@ function requestAutofill(isMore) {
       current: {
         description: document.getElementById('mDesc').value.trim(),
         tags: parseTags(document.getElementById('mTags').value),
-        year: document.getElementById('mYear').value.trim()
+        year: document.getElementById('mYear').value.trim(),
+        duration: document.getElementById('mDuration').value.trim()
       }
     })
   })
@@ -629,6 +659,7 @@ function normalizeAutofillItem(item) {
     description: cleanString(item.description),
     tags: normalizeTags(item.tags),
     year: normalizeYear(item.year),
+    duration: normalizeDuration(item.duration),
     coverUrl: cleanString(item.coverUrl || item.cover || item.image || item.picUrl),
     link: cleanString(item.link || item.url || item.sourceUrl),
     confidence: Number(item.confidence) || 0,
@@ -648,12 +679,12 @@ function getAutofillLoadingMessage(title, artist, clue) {
 function normalizeAutofillCandidates(candidates) {
   if (!Array.isArray(candidates)) return [];
   return candidates.map(normalizeAutofillItem).filter(function (item) {
-    return item.title || item.artist || item.description || item.year || item.coverUrl || item.link || item.tags.length;
+    return item.title || item.artist || item.description || item.year || item.duration || item.coverUrl || item.link || item.tags.length;
   }).slice(0, 3);
 }
 
 function hasUsefulAutofillData(item) {
-  return Boolean(item.artist || item.description || item.year || item.coverUrl || item.link || item.tags.length);
+  return Boolean(item.artist || item.description || item.year || item.duration || item.coverUrl || item.link || item.tags.length);
 }
 
 function renderAutofillCandidates(candidates) {
@@ -668,6 +699,7 @@ function renderAutofillCandidates(candidates) {
       var meta = [
         item.artist,
         item.year,
+        item.duration,
         normalizeTags(item.tags).join(' / ')
       ].filter(Boolean).join(' · ');
 
@@ -710,6 +742,7 @@ function applyAutofillData(item) {
   fillEmptyField('mDesc', item.description);
   fillEmptyField('mLink', item.link);
   fillEmptyField('mYear', item.year);
+  fillEmptyField('mDuration', item.duration);
 
   var tags = normalizeTags(item.tags);
   if (tags.length && !document.getElementById('mTags').value.trim()) {
