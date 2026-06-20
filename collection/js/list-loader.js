@@ -107,9 +107,10 @@
 
     var selectedIndex = 0;
 
-    function renderSelectedMusic(item) {
+    function renderSelectedMusic(item, animateCover) {
       feature.innerHTML = [
-        '<div class="music-player-cover">' + coverImg(item) + '</div>',
+        '<div class="music-player-content">',
+        '<div class="music-player-cover' + (animateCover ? ' is-switching' : '') + '">' + coverImg(item) + '</div>',
         '<div class="music-player-meta">',
         '<h1>' + esc(item.title || '未命名音乐') + '</h1>',
         '<p>' + esc(item.artist || item.description || '未填写艺术家') + '</p>',
@@ -119,7 +120,8 @@
         '<button class="music-panel-btn music-panel-play" type="button" aria-label="播放"><i class="fa-solid fa-play"></i></button>',
         '<button class="music-panel-btn" type="button" data-music-action="next" aria-label="下一首"><i class="fa-solid fa-forward-step"></i></button>',
         '</div>',
-        '<div class="music-player-progress" aria-hidden="true"><span></span></div>'
+        '<div class="music-player-progress" aria-hidden="true"><span></span></div>',
+        '</div>'
       ].join('');
     }
 
@@ -132,27 +134,12 @@
     }
 
     function setSelected(index) {
-      selectedIndex = Math.max(0, Math.min(items.length - 1, index));
-
-      /* Instant blur -> paint -> swap -> smooth unblur */
-      var content = document.getElementById('musicPlayerContent');
-      if (content) {
-        content.classList.add('switching');
-        content.offsetHeight; /* force paint */
-      }
-
-      requestAnimationFrame(function () {
-        renderSelectedMusic(items[selectedIndex]);
-        updateMusicPalette(items[selectedIndex]);
-        applyDistances(selectedIndex);
-
-        content = document.getElementById('musicPlayerContent');
-        if (content) {
-          requestAnimationFrame(function () {
-            content.classList.remove('switching');
-          });
-        }
-      });
+      var nextIndex = Math.max(0, Math.min(items.length - 1, index));
+      var animateCover = feature.querySelector('.music-player-cover') !== null && nextIndex !== selectedIndex;
+      selectedIndex = nextIndex;
+      renderSelectedMusic(items[selectedIndex], animateCover);
+      updateMusicPalette(items[selectedIndex]);
+      applyDistances(selectedIndex);
     }
 
     queue.innerHTML = items.map(function (item, index) {
