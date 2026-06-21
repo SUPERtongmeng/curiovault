@@ -20,6 +20,7 @@
     var audio = new Audio();
     var isPlaying = false;
     var isLyricsView = false;
+    var isTranslationVisible = true;
     var preloadedCovers = new Map();
     var lyricsCache = new Map();
     var hasScheduledCoverWarmup = false;
@@ -49,7 +50,7 @@
         '<div class="music-player-cover">' + coverImg(item, { loading: 'eager' }) + '</div>',
         '<div class="music-player-meta">',
         '<h1>' + esc(item.title || '未命名音乐') + '</h1>',
-        '<p class="music-player-artist"><span>' + esc(item.artist || item.description || '未填写艺术家') + '</span><button class="music-lyrics-toggle" type="button" data-music-action="lyrics" aria-label="歌词" aria-pressed="' + (isLyricsView ? 'true' : 'false') + '">' + iconLyrics() + '</button></p>',
+        '<p class="music-player-artist"><span>' + esc(item.artist || item.description || '未填写艺术家') + '</span>' + iconTranslationButton(isLyricsView, isTranslationVisible) + '<button class="music-lyrics-toggle" type="button" data-music-action="lyrics" aria-label="歌词" aria-pressed="' + (isLyricsView ? 'true' : 'false') + '">' + iconLyrics() + '</button></p>',
         '</div>',
         '<div class="music-player-controls" aria-label="音乐控制">',
         '<button class="music-panel-btn" type="button" data-music-action="prev" aria-label="上一首">' + iconPrev() + '</button>',
@@ -192,6 +193,7 @@
       updateMusicPalette(items[selectedIndex]);
       applyDistances(selectedIndex);
       updateLyricsToggle();
+      updateTranslationToggle();
       loadSelectedAudio(isPlaying);
       preloadNearbyCovers(selectedIndex);
       scheduleCoverWarmup();
@@ -253,6 +255,10 @@
       var musicAction = action.dataset.musicAction;
       if (musicAction === 'lyrics') {
         toggleLyricsView();
+        return;
+      }
+      if (musicAction === 'translation') {
+        toggleTranslationView();
         return;
       }
       if (musicAction === 'toggle') {
@@ -435,6 +441,7 @@
       hideMusicHoverCard(hoverCard);
       queue.classList.toggle('is-lyrics-view', isLyricsView);
       updateLyricsToggle();
+      updateTranslationToggle();
       if (isLyricsView) loadLyricsForSelected();
     }
 
@@ -442,6 +449,22 @@
       var button = feature.querySelector('[data-music-action="lyrics"]');
       if (!button) return;
       button.setAttribute('aria-pressed', isLyricsView ? 'true' : 'false');
+    }
+
+    function toggleTranslationView() {
+      if (!isLyricsView) return;
+      isTranslationVisible = !isTranslationVisible;
+      updateTranslationToggle();
+    }
+
+    function updateTranslationToggle() {
+      var button = feature.querySelector('[data-music-action="translation"]');
+      if (!button) return;
+      button.classList.toggle('is-visible', isLyricsView);
+      button.setAttribute('aria-hidden', isLyricsView ? 'false' : 'true');
+      button.tabIndex = isLyricsView ? 0 : -1;
+      button.setAttribute('aria-pressed', isTranslationVisible ? 'true' : 'false');
+      queue.classList.toggle('is-translation-hidden', !isTranslationVisible);
     }
 
     function loadLyricsForSelected() {
@@ -541,7 +564,7 @@
             '--line-index:' + index,
             '--line-delay:' + ((8 - index) * 34) + 'ms',
             '--line-distance:' + distanceAbs,
-            '--line-shift:' + (distanceAbs * -3) + 'px',
+            '--line-shift:0px',
             '--line-scale:' + (1 - Math.min(distanceAbs, 4) * 0.035).toFixed(3),
             '--line-opacity:' + Math.max(0.22, 0.74 - distanceAbs * 0.13).toFixed(2)
           ].join(';');
@@ -552,17 +575,20 @@
     }
 
     function renderLyricPrimary(text, isCurrent) {
-      if (!isCurrent) return '<span class="queue-lyric-primary">' + esc(text) + '</span>';
+      if (!isCurrent || !shouldSplitLyricWords(text)) return '<span class="queue-lyric-primary">' + esc(text) + '</span>';
       return '<span class="queue-lyric-primary">' + splitLyricTokens(text).map(function (token, index) {
         return '<span class="queue-lyric-word" style="--word-index:' + index + ';--word-delay:' + (index * 18) + 'ms">' + esc(token) + '</span>';
       }).join('') + '</span>';
     }
 
+    function shouldSplitLyricWords(text) {
+      return /[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(String(text || ''));
+    }
+
     function splitLyricTokens(text) {
       var value = String(text || '');
       if (!value.trim()) return [''];
-      if (/[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(value)) return Array.from(value);
-      return value.split(/(\s+)/);
+      return Array.from(value);
     }
 
     function renderQueueLyricsStatus(message) {
@@ -808,6 +834,14 @@
 
   function iconNext() {
     return '<svg class="music-panel-icon music-panel-icon-flow" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path class="icon-flow-out icon-flow-a" d="M17.2 9.7c0-1.25 1.42-1.96 2.42-1.22l8.1 6.02c.9.67.9 2.03 0 2.7l-8.1 6.02c-1 .74-2.42.03-2.42-1.22V9.7z" /><path class="icon-flow-out icon-flow-b" d="M7.2 9.7c0-1.25 1.42-1.96 2.42-1.22l8.1 6.02c.9.67.9 2.03 0 2.7l-8.1 6.02c-1 .74-2.42.03-2.42-1.22V9.7z" /><path class="icon-flow-in icon-flow-a" d="M17.2 9.7c0-1.25 1.42-1.96 2.42-1.22l8.1 6.02c.9.67.9 2.03 0 2.7l-8.1 6.02c-1 .74-2.42.03-2.42-1.22V9.7z" /><path class="icon-flow-in icon-flow-b" d="M7.2 9.7c0-1.25 1.42-1.96 2.42-1.22l8.1 6.02c.9.67.9 2.03 0 2.7l-8.1 6.02c-1 .74-2.42.03-2.42-1.22V9.7z" /></svg>';
+  }
+
+  function iconTranslationButton(isVisible, isPressed) {
+    return '<button class="music-translation-toggle' + (isVisible ? ' is-visible' : '') + '" type="button" data-music-action="translation" aria-label="Toggle translation" aria-pressed="' + (isPressed ? 'true' : 'false') + '" aria-hidden="' + (isVisible ? 'false' : 'true') + '" tabindex="' + (isVisible ? '0' : '-1') + '">' + iconTranslation() + '</button>';
+  }
+
+  function iconTranslation() {
+    return '<svg class="track-translation-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5.6h8.2M9.1 3.5v2.1m2.9 0c-.5 2.9-2.2 5.1-5.6 6.8m1.8-4.8c.7 1.8 2 3.3 3.9 4.5M14.8 18.7l3.5-8.4 3.5 8.4m-5.6-2.2h4.2" /></svg>';
   }
 
   function iconLyrics() {

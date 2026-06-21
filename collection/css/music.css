@@ -270,6 +270,52 @@ body.page-music {
   box-shadow: 0 0 14px rgba(255, 255, 255, 0.28);
 }
 
+.music-translation-toggle {
+  position: relative;
+  top: 2px;
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  margin-right: -44px;
+  border: 0;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  padding: 0;
+  line-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, 0, 0) scale(0.72);
+  transform-origin: right center;
+  transition: opacity 0.22s ease, margin-right 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.18s ease;
+}
+
+.music-translation-toggle.is-visible {
+  margin-right: 0;
+  opacity: 0.72;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.music-translation-toggle.is-visible:hover,
+.music-translation-toggle[aria-pressed="true"].is-visible {
+  opacity: 1;
+}
+
+.music-translation-toggle[aria-pressed="true"].is-visible {
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.24);
+}
+
+.music-translation-toggle + .music-lyrics-toggle {
+  margin-left: 0;
+}
+
+.track-translation-icon,
 .track-lyrics-icon {
   width: 20px;
   height: 20px;
@@ -798,6 +844,10 @@ body.page-music {
 .queue-lyric-line.is-current .queue-lyric-translation {
   color: rgba(255, 255, 255, 0.68);
   font-size: clamp(0.86rem, 1.22vw, 1.08rem);
+}
+
+.music-queue.is-translation-hidden .queue-lyric-translation {
+  display: none;
 }
 
 .queue-lyrics-status {
