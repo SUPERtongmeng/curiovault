@@ -427,24 +427,34 @@
       updateQueueLyrics(elapsed, duration);
     }
 
-    var savedQueueScroll = 0;
-
     function toggleLyricsView() {
-      isLyricsView = !isLyricsView;
+      if (isLyricsView) {
+        exitLyricsView();
+        return;
+      }
+      isLyricsView = true;
       lastLyricIndex = -1;
       hideMusicHoverCard(hoverCard);
-      if (isLyricsView) {
-        savedQueueScroll = queue.scrollTop;
-        queue.scrollTop = 0;
-        queue.classList.add('is-lyrics-view');
+      queue.classList.add('is-lyrics-view');
+      updateLyricsToggle();
+      loadLyricsForSelected();
+    }
+
+    function exitLyricsView() {
+      isLyricsView = false;
+      var trackList = queue.querySelector('.music-track-list');
+      if (trackList) {
+        trackList.style.transform = 'translate3d(0, 0, 0)';
+        trackList.addEventListener('transitionend', function onEnd(event) {
+          if (event.propertyName !== 'transform') return;
+          trackList.removeEventListener('transitionend', onEnd);
+          trackList.style.transform = '';
+          queue.classList.remove('is-lyrics-view');
+        });
       } else {
-        queue.scrollTop = savedQueueScroll;
         queue.classList.remove('is-lyrics-view');
       }
       updateLyricsToggle();
-      if (isLyricsView) {
-        loadLyricsForSelected();
-      }
     }
 
     function updateLyricsToggle() {

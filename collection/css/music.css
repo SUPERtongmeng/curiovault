@@ -596,15 +596,13 @@ body.page-music {
   transition-delay: 0s;
 }
 
-.music-queue.is-lyrics-view {
-  overflow-y: hidden;
-}
-
 .music-queue.is-lyrics-view .music-track {
   opacity: 0;
 }
 
 .music-queue.is-lyrics-view .music-track-list {
+  position: absolute;
+  width: 100%;
   pointer-events: none;
   transform: translate3d(96px, 0, 0);
 }
