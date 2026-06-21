@@ -99,7 +99,6 @@ body.page-music {
   .music-track,
   .music-lyrics-view,
   .queue-lyric-line,
-  .queue-lyrics-progress,
   .music-hover-card.is-switching .music-hover-cover img,
   .music-hover-card.is-switching .music-hover-cover .cover-letter,
   .music-hover-card.is-switching .music-hover-main,
@@ -771,32 +770,6 @@ body.page-music {
 .queue-lyrics-status .queue-lyric-line {
   --line-index: 8;
   color: rgba(255, 255, 255, 0.9);
-}
-
-.queue-lyrics-progress {
-  height: 4px;
-  overflow: hidden;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  opacity: 0;
-  transform: translate3d(-36px, 0, 0);
-  transition: transform 0.46s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
-  transition-delay: 0.04s;
-}
-
-.music-queue.is-lyrics-view .queue-lyrics-progress {
-  opacity: 0.72;
-  transform: translate3d(0, 0, 0);
-}
-
-.queue-lyrics-progress span {
-  display: block;
-  width: 0;
-  height: 100%;
-  border-radius: inherit;
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow: 0 0 18px rgba(255, 255, 255, 0.2);
 }
 
 @keyframes lyricWordLift {

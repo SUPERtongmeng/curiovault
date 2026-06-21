@@ -493,12 +493,6 @@
       if (activeIndex !== lastLyricIndex || !panel.querySelector('.queue-lyrics-lines:not(.queue-lyrics-status)')) {
         lastLyricIndex = activeIndex;
         renderQueueLyrics(panel, result, elapsed, duration);
-        return;
-      }
-      var progressBar = panel.querySelector('.queue-lyrics-progress span');
-      if (progressBar && duration) {
-        var ratio = Math.max(0, Math.min(1, elapsed / duration));
-        progressBar.style.width = (ratio * 100).toFixed(2) + '%';
       }
     }
 
@@ -530,7 +524,6 @@
       }
       var activeIndex = getActiveLyricIndex(lines, elapsed);
       var windowLines = getLyricWindow(lines, activeIndex);
-      var progressRatio = duration ? Math.max(0, Math.min(1, elapsed / duration)) : 0;
       panel.innerHTML = [
         '<div class="queue-lyrics-lines" style="--active-line:' + activeIndex + '">',
         windowLines.map(function (line, index) {
@@ -548,8 +541,7 @@
           ].join(';');
           return '<p class="' + className + '" style="' + lineStyle + '">' + primary + (line.translation ? '<span class="queue-lyric-translation">' + esc(line.translation) + '</span>' : '') + '</p>';
         }).join(''),
-        '</div>',
-        '<span class="queue-lyrics-progress"><span style="width:' + (progressRatio * 100).toFixed(2) + '%"></span></span>'
+        '</div>'
       ].join('');
     }
 
@@ -568,7 +560,7 @@
     }
 
     function renderQueueLyricsStatus(message) {
-      return '<div class="queue-lyrics-lines queue-lyrics-status"><p class="queue-lyric-line is-current"><span class="queue-lyric-primary">' + esc(message) + '</span></p></div><span class="queue-lyrics-progress"><span></span></span>';
+      return '<div class="queue-lyrics-lines queue-lyrics-status"><p class="queue-lyric-line is-current"><span class="queue-lyric-primary">' + esc(message) + '</span></p></div>';
     }
 
     function getActiveLyricIndex(lines, elapsed) {
