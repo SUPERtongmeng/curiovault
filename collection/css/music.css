@@ -95,7 +95,8 @@ body.page-music {
 @media (prefers-reduced-motion: reduce) {
   .fluid-orb,
   .music-player-content.is-switching .music-player-cover,
-  .music-player-content.is-switching .music-player-meta,
+  .music-player-content.is-switching .music-player-meta h1,
+  .music-player-content.is-switching .music-player-artist span,
   .music-track,
   .music-lyrics-view,
   .queue-lyric-line,
@@ -143,7 +144,7 @@ body.page-music {
   position: relative;
   overflow: hidden;
   border-radius: 64px;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.14);
   isolation: isolate;
   transform-origin: center;
 }
@@ -171,7 +172,8 @@ body.page-music {
   animation: playerCoverSwitchIn 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) both;
 }
 
-.music-player-content.is-switching .music-player-meta {
+.music-player-content.is-switching .music-player-meta h1,
+.music-player-content.is-switching .music-player-artist span {
   animation: playerTextSwitchIn 0.42s cubic-bezier(0.25, 0.1, 0.25, 1) both;
 }
 
@@ -218,7 +220,7 @@ body.page-music {
 
 .music-player-meta p {
   margin: 6px 0 0;
-  overflow: hidden;
+  overflow: visible;
   color: var(--text-muted);
   font-size: 1.2rem;
   white-space: nowrap;
@@ -228,16 +230,21 @@ body.page-music {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 40px;
 }
 
 .music-player-artist span {
   min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .music-lyrics-toggle {
+  position: relative;
+  top: 2px;
   width: 34px;
+  margin-left: auto;
   height: 34px;
   border: 0;
   border-radius: 50%;
@@ -245,24 +252,42 @@ body.page-music {
   display: inline-grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.95);
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+  padding: 0;
+  line-height: 0;
+  opacity: 0.42;
+  transition: none;
 }
 
-.music-lyrics-toggle:hover,
-.music-lyrics-toggle[aria-pressed="true"] {
-  background: rgba(255, 255, 255, 0.26);
+.music-lyrics-toggle:hover {
+  opacity: 0.72;
 }
 
 .music-lyrics-toggle[aria-pressed="true"] {
-  transform: translateY(-1px);
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.28);
 }
 
 .track-lyrics-icon {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.track-lyrics-icon .lyrics-bubble {
+  fill: none;
+}
+
+.track-lyrics-icon .lyrics-quote {
   fill: currentColor;
+  stroke: none;
 }
 
 .music-player-controls {
@@ -560,9 +585,6 @@ body.page-music {
   width: calc(100% + 24px);
   padding-left: 24px;
   margin-left: -24px;
-  padding-left: 24px;
-  margin-left: -24px;
-}
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
   scrollbar-gutter: stable;
@@ -610,13 +632,20 @@ body.page-music {
 
 .music-queue.is-lyrics-view .music-track {
   opacity: 0;
+  transition-delay: 0ms;
 }
 
 .music-queue.is-lyrics-view .music-track-scroll {
+  overflow: hidden;
   pointer-events: none;
-  transform: translate3d(96px, 0, 0);
+  scrollbar-width: none;
+  transform: translate3d(34px, 0, 0);
 }
 
+.music-queue.is-lyrics-view .music-track-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
 .music-track:hover,
 .music-track.is-active {
   background: rgba(255, 255, 255, 0.22);
@@ -677,7 +706,7 @@ body.page-music {
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
-  transform: translate3d(-64px, 0, 0);
+  transform: translate3d(-28px, 0, 0);
   transition: transform 0.52s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.32s ease;
   isolation: isolate;
 }
@@ -709,7 +738,7 @@ body.page-music {
   letter-spacing: 0;
   opacity: 0;
   filter: blur(0.4px);
-  transform: translate3d(-54px, 0, 0) scale(0.96);
+  transform: translate3d(-22px, 0, 0) scale(0.96);
   transform-origin: left center;
   transition: transform 0.52s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.34s ease, color 0.24s ease, filter 0.24s ease;
   transition-delay: var(--line-delay, 0ms);
@@ -1040,6 +1069,11 @@ body.page-music {
   .music-player-meta {
     margin-top: 8px;
     text-align: center;
+  }
+
+  .music-player-artist {
+    width: 100%;
+    text-align: left;
   }
 
   .music-player-controls {

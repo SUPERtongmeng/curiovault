@@ -440,7 +440,8 @@
 
     function updateLyricsToggle() {
       var button = feature.querySelector('[data-music-action="lyrics"]');
-      if (button) button.setAttribute('aria-pressed', isLyricsView ? 'true' : 'false');
+      if (!button) return;
+      button.setAttribute('aria-pressed', isLyricsView ? 'true' : 'false');
     }
 
     function loadLyricsForSelected() {
@@ -810,7 +811,7 @@
   }
 
   function iconLyrics() {
-    return '<svg class="track-lyrics-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5.5 5.8h13v2h-13v-2zm0 5.1h9.4v2H5.5v-2zm0 5.1h6.8v2H5.5v-2z" /></svg>';
+    return '<svg class="track-lyrics-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="lyrics-bubble" d="M5.7 4.8h12.6c1.15 0 2.1.95 2.1 2.1v7.5c0 1.15-.95 2.1-2.1 2.1h-6.8l-4.2 3.25c-.38.3-.94.02-.94-.46V16.5H5.7c-1.15 0-2.1-.95-2.1-2.1V6.9c0-1.15.95-2.1 2.1-2.1z" /><path class="lyrics-quote" d="M8.25 8.55h2.45c.33 0 .6.27.6.6v2.05c0 .33-.27.6-.6.6H8.25c-.33 0-.6-.27-.6-.6V9.15c0-.33.27-.6.6-.6zm5 0h2.45c.33 0 .6.27.6.6v2.05c0 .33-.27.6-.6.6h-2.45c-.33 0-.6-.27-.6-.6V9.15c0-.33.27-.6.6-.6z" /></svg>';
   }
   function getCoverSrc(item) {
     if (!item) return '';
