@@ -8,3 +8,4 @@ var FIREBASE_CONFIG = {
 };
 
 var CURIOVAULT_AUTOFILL_ENDPOINT = 'https://curiovault-theta.vercel.app/api/autofillCollectionItem';
+var CURIOVAULT_LYRICS_ENDPOINT = 'https://curiovault-theta.vercel.app/api/musicLyrics';

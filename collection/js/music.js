@@ -448,7 +448,7 @@
         return;
       }
       panel.innerHTML = renderQueueLyricsStatus('\u6b63\u5728\u52a0\u8f7d\u6b4c\u8bcd');
-      fetch('/api/musicLyrics', {
+      fetch(getLyricsEndpoint(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: item.title || '', artist: item.artist || '', link: item.link || '', songId: item.neteaseSongId || item.songId || '' })
@@ -575,6 +575,16 @@
     function getLyricsKey(item) {
       if (!item) return '';
       return [item.neteaseSongId || item.songId || extractNetEaseSongId(item.link), item.title || '', item.artist || ''].filter(Boolean).join('|').toLowerCase();
+    }
+
+    function getLyricsEndpoint() {
+      if (typeof CURIOVAULT_LYRICS_ENDPOINT !== 'undefined' && CURIOVAULT_LYRICS_ENDPOINT) {
+        return CURIOVAULT_LYRICS_ENDPOINT;
+      }
+      if (window.location.hostname.indexOf('vercel.app') !== -1) {
+        return '/api/musicLyrics';
+      }
+      return '';
     }
 
     function extractNetEaseSongId(link) {
