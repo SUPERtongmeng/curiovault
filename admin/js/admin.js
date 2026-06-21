@@ -44,6 +44,7 @@ var btnAutofill = document.getElementById('btnAutofill');
 var autofillStatus = document.getElementById('autofillStatus');
 var autofillPanel = document.getElementById('autofillPanel');
 var durationGroup = document.getElementById('durationGroup');
+var songIdGroup = document.getElementById('songIdGroup');
 var autofillCandidates = [];
 var autofillExcludedCandidates = [];
 
@@ -172,6 +173,7 @@ document.getElementById('btnExport').addEventListener('click', function () {
       coverUrl: item.coverUrl || '',
       description: item.description || '',
       link: item.link || '',
+      neteaseSongId: item.neteaseSongId || item.songId || '',
       year: item.year || null,
       duration: item.duration || null,
       rating: item.rating || 4,
@@ -316,6 +318,7 @@ function importItems(importedItems) {
       coverUrl: item.coverUrl || '',
       description: item.description || '',
       link: item.link || '',
+      neteaseSongId: item.category === 'music' ? normalizeSongId(item.neteaseSongId || item.songId || extractNetEaseSongId(item.link)) : null,
       year: normalizeYear(item.year),
       duration: item.category === 'music' ? normalizeDuration(item.duration) : null,
       rating: clampRating(item.rating),
@@ -355,6 +358,7 @@ function normalizeDoc(doc) {
     coverUrl: data.coverUrl || '',
     description: data.description || '',
     link: data.link || '',
+    neteaseSongId: data.neteaseSongId || data.songId || '',
     year: data.year || null,
     duration: data.duration || null,
     rating: data.rating || 4,
@@ -374,6 +378,7 @@ function normalizeRestDoc(doc) {
     coverUrl: data.coverUrl || '',
     description: data.description || '',
     link: data.link || '',
+    neteaseSongId: data.neteaseSongId || data.songId || '',
     year: data.year || null,
     duration: data.duration || null,
     rating: data.rating || 4,
@@ -438,6 +443,7 @@ function readFormData() {
   var title = document.getElementById('mTitle').value.trim();
   var category = document.getElementById('mCat').value;
   var duration = category === 'music' ? normalizeDuration(document.getElementById('mDuration').value) : null;
+  var neteaseSongId = category === 'music' ? normalizeSongId(document.getElementById('mSongId').value) : null;
 
   if (!title) {
     alert('请填写标题');
@@ -471,6 +477,7 @@ function readFormData() {
     coverUrl: document.getElementById('mCover').value.trim(),
     description: document.getElementById('mDesc').value.trim(),
     link: document.getElementById('mLink').value.trim(),
+    neteaseSongId: neteaseSongId,
     tags: parseTags(document.getElementById('mTags').value),
     year: year,
     duration: duration,
@@ -488,6 +495,18 @@ function normalizeDuration(value) {
   if (value === null || value === undefined) return null;
   var duration = String(value).trim();
   return duration || null;
+}
+
+function normalizeSongId(value) {
+  var songId = cleanString(value);
+  return songId || null;
+}
+
+function extractNetEaseSongId(link) {
+  var value = cleanString(link);
+  if (!value) return '';
+  var match = value.match(new RegExp('[?&#]id=(\\d+)')) || value.match(new RegExp('song/(\\d+)')) || value.match(new RegExp('\\b(\\d{5,})\\b'));
+  return match ? match[1] : '';
 }
 
 function cleanString(value) {
@@ -509,7 +528,11 @@ function closeModal() {
 function syncMusicFields() {
   var isMusic = document.getElementById('mCat').value === 'music';
   if (durationGroup) durationGroup.hidden = !isMusic;
-  if (!isMusic) document.getElementById('mDuration').value = '';
+  if (songIdGroup) songIdGroup.hidden = !isMusic;
+  if (!isMusic) {
+    document.getElementById('mDuration').value = '';
+    document.getElementById('mSongId').value = '';
+  }
 }
 
 function editItem(id) {
@@ -529,6 +552,7 @@ function editItem(id) {
   document.getElementById('mLink').value = item.link || '';
   document.getElementById('mYear').value = item.year || '';
   document.getElementById('mDuration').value = item.duration || '';
+  document.getElementById('mSongId').value = item.neteaseSongId || item.songId || extractNetEaseSongId(item.link) || '';
   syncMusicFields();
   document.getElementById('mRating').value = item.rating || 4;
   submitBtn.textContent = '保存到 Firestore';
@@ -588,7 +612,8 @@ function requestAutofill(isMore) {
         description: document.getElementById('mDesc').value.trim(),
         tags: parseTags(document.getElementById('mTags').value),
         year: document.getElementById('mYear').value.trim(),
-        duration: document.getElementById('mDuration').value.trim()
+        duration: document.getElementById('mDuration').value.trim(),
+        neteaseSongId: document.getElementById('mSongId').value.trim()
       }
     })
   })
@@ -660,6 +685,7 @@ function normalizeAutofillItem(item) {
     tags: normalizeTags(item.tags),
     year: normalizeYear(item.year),
     duration: normalizeDuration(item.duration),
+    neteaseSongId: normalizeSongId(item.neteaseSongId || item.songId || extractNetEaseSongId(item.link)),
     coverUrl: cleanString(item.coverUrl || item.cover || item.image || item.picUrl),
     link: cleanString(item.link || item.url || item.sourceUrl),
     confidence: Number(item.confidence) || 0,
@@ -679,12 +705,12 @@ function getAutofillLoadingMessage(title, artist, clue) {
 function normalizeAutofillCandidates(candidates) {
   if (!Array.isArray(candidates)) return [];
   return candidates.map(normalizeAutofillItem).filter(function (item) {
-    return item.title || item.artist || item.description || item.year || item.duration || item.coverUrl || item.link || item.tags.length;
+    return item.title || item.artist || item.description || item.year || item.duration || item.neteaseSongId || item.coverUrl || item.link || item.tags.length;
   }).slice(0, 3);
 }
 
 function hasUsefulAutofillData(item) {
-  return Boolean(item.artist || item.description || item.year || item.duration || item.coverUrl || item.link || item.tags.length);
+  return Boolean(item.artist || item.description || item.year || item.duration || item.neteaseSongId || item.coverUrl || item.link || item.tags.length);
 }
 
 function renderAutofillCandidates(candidates) {
@@ -743,6 +769,7 @@ function applyAutofillData(item) {
   fillEmptyField('mLink', item.link);
   fillEmptyField('mYear', item.year);
   fillEmptyField('mDuration', item.duration);
+  fillEmptyField('mSongId', item.neteaseSongId || item.songId || extractNetEaseSongId(item.link));
 
   var tags = normalizeTags(item.tags);
   if (tags.length && !document.getElementById('mTags').value.trim()) {

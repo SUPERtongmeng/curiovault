@@ -63,7 +63,7 @@
     var config = {
       music: {
         categories: ['music'],
-        render: renderMusic
+        render: renderMusicPage
       },
       film: {
         categories: ['movie', 'tv'],
@@ -95,98 +95,13 @@
       });
   }
 
-  function renderMusic(items) {
-    var feature = document.getElementById('musicFeature');
-    var queue = document.getElementById('musicQueue');
-    if (!feature || !queue) return;
-    if (items.length === 0) {
-      feature.innerHTML = emptyBlock('还没有音乐收藏');
-      queue.innerHTML = '';
+  function renderMusicPage(items) {
+    if (window.CollectionMusic && typeof window.CollectionMusic.renderMusic === 'function') {
+      window.CollectionMusic.renderMusic(items);
       return;
     }
-
-    var selectedIndex = 0;
-
-    function renderSelectedMusic(item, animateCover) {
-      feature.innerHTML = [
-        '<div class="music-player-content">',
-        '<div class="music-player-cover' + (animateCover ? ' is-switching' : '') + '">' + coverImg(item) + '</div>',
-        '<div class="music-player-meta">',
-        '<h1>' + esc(item.title || '未命名音乐') + '</h1>',
-        '<p>' + esc(item.artist || item.description || '未填写艺术家') + '</p>',
-        '</div>',
-        '<div class="music-player-controls" aria-label="音乐控制">',
-        '<button class="music-panel-btn" type="button" data-music-action="prev" aria-label="上一首"><i class="fa-solid fa-backward-step"></i></button>',
-        '<button class="music-panel-btn music-panel-play" type="button" aria-label="播放"><i class="fa-solid fa-play"></i></button>',
-        '<button class="music-panel-btn" type="button" data-music-action="next" aria-label="下一首"><i class="fa-solid fa-forward-step"></i></button>',
-        '</div>',
-        '<div class="music-player-progress" aria-hidden="true"><span></span></div>',
-        '</div>'
-      ].join('');
-    }
-
-    function applyDistances(centerIndex) {
-      queue.querySelectorAll('.music-track').forEach(function (track) {
-        var dist = Math.abs(Number(track.dataset.index) - centerIndex);
-        track.classList.toggle('is-active', dist === 0);
-        track.style.setProperty('--dist', dist);
-      });
-    }
-
-    function setSelected(index) {
-      var nextIndex = Math.max(0, Math.min(items.length - 1, index));
-      var animateCover = feature.querySelector('.music-player-cover') !== null && nextIndex !== selectedIndex;
-      selectedIndex = nextIndex;
-      renderSelectedMusic(items[selectedIndex], animateCover);
-      updateMusicPalette(items[selectedIndex]);
-      applyDistances(selectedIndex);
-    }
-
-    queue.innerHTML = items.map(function (item, index) {
-      return [
-        '<article class="music-track' + (index === 0 ? ' is-active' : '') + '" role="button" tabindex="0" data-index="' + index + '">',
-        '<div class="track-cover">' + coverImg(item) + '</div>',
-        '<div class="track-info"><strong>' + esc(item.title || '未命名音乐') + '</strong><span>' + esc(item.artist || item.year || '') + '</span></div>',
-        '</article>'
-      ].join('');
-    }).join('');
-
-    queue.querySelectorAll('.music-track').forEach(function (track) {
-      track.addEventListener('click', function () {
-        setSelected(Number(track.dataset.index) || 0);
-      });
-      track.addEventListener('keydown', function (event) {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        setSelected(Number(track.dataset.index) || 0);
-      });
-      track.addEventListener('mouseenter', function () {
-        applyDistances(Number(track.dataset.index) || 0);
-      });
-    });
-
-    queue.addEventListener('mouseleave', function () {
-      applyDistances(selectedIndex);
-    });
-
-    feature.addEventListener('click', function (event) {
-      var action = event.target.closest('[data-music-action]');
-      if (!action) return;
-      if (action.dataset.musicAction === 'prev') setSelected(selectedIndex - 1);
-      if (action.dataset.musicAction === 'next') setSelected(selectedIndex + 1);
-    });
-
-    setSelected(0);
+    setError('music', '音乐页脚本加载失败');
   }
-
-  function updateMusicPalette(item) {
-    if (window.updateMusicFluidPalette) {
-      window.updateMusicFluidPalette(item);
-      return;
-    }
-    document.dispatchEvent(new CustomEvent('music:coverchange', { detail: item }));
-  }
-
   function renderFilm(items) {
     var movieList = document.getElementById('movieList');
     var tvList = document.getElementById('tvList');

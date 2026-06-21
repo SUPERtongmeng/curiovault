@@ -1,4 +1,4 @@
-﻿// Shared front-end shell: navigation, mobile menu, and home background.
+// Shared front-end shell: navigation, mobile menu, and home background.
 (function () {
   var CATEGORY_LABELS = {
     music: '音乐',
@@ -27,7 +27,6 @@
   initCategoryShowcase();
   initRecentCollection();
   initMusicPlayer();
-  initMusicFluidBackground();
 
   function applyDefaultTheme() {
     document.documentElement.setAttribute('data-theme', 'dark');
@@ -325,10 +324,8 @@
     if (!target) return;
     target.innerHTML = [
       '<div class="activity-head">',
-      '<div>',
       '<h3>收藏活跃图</h3>',
-      '<p>正在计算新增记录...</p>',
-      '</div>',
+      '<p class="activity-summary">正在计算新增记录...</p>',
       '</div>',
       '<p class="collection-empty activity-empty">正在读取活跃记录...</p>'
     ].join('');
@@ -338,10 +335,8 @@
     if (!target) return;
     target.innerHTML = [
       '<div class="activity-head">',
-      '<div>',
       '<h3>收藏活跃图</h3>',
-      '<p>过去一年新增收藏</p>',
-      '</div>',
+      '<p class="activity-summary">过去一年新增收藏</p>',
       '</div>',
       '<p class="collection-empty activity-empty">活跃图加载失败</p>'
     ].join('');
@@ -383,14 +378,12 @@
 
     var weekCount = Math.ceil(days.length / 7);
     var monthLabels = getActivityMonthLabels(days);
-    var cellColumns = 'repeat(' + weekCount + ', 10px)';
+    var cellColumns = 'repeat(' + weekCount + ', 8px)';
 
     target.innerHTML = [
       '<div class="activity-head">',
-      '<div>',
       '<h3>收藏活跃图</h3>',
-      '<p>' + (total ? '过去一年新增 ' + total + ' 件收藏' : '过去一年还没有新增收藏') + '</p>',
-      '</div>',
+      '<p class="activity-summary">' + (total ? '过去一年新增 ' + total + ' 件收藏' : '过去一年还没有新增收藏') + '</p>',
       '</div>',
       '<div class="activity-scroll" tabindex="0" aria-label="过去一年新增收藏热力图">',
       '<div class="activity-months" style="grid-template-columns: ' + escAttr(cellColumns) + ';">',
@@ -554,11 +547,10 @@
 
   function renderRecentFeature(target, item) {
     target.innerHTML = [
-      '<a class="recent-feature-card" href="' + getItemPageHref(item.category) + '">',
+      '<a class="recent-feature-card recent-feature-' + escAttr(getDisplayCategory(item.category)) + '" href="' + getItemPageHref(item.category) + '">',
       '<div class="recent-feature-cover">' + renderRecentCover(item) + '</div>',
       '<div class="recent-feature-info">',
-      '<span class="recent-cat recent-cat-' + escAttr(getDisplayCategory(item.category)) + '">' + esc(getCategoryLabelForDisplay(item.category)) + '</span>',
-      '<h3>' + esc(item.title || '未命名收藏') + '</h3>',
+      '<h3 class="recent-title-' + escAttr(getDisplayCategory(item.category)) + '">' + esc(item.title || '未命名收藏') + '</h3>',
       '<p>' + esc(item.description || item.artist || '暂无描述') + '</p>',
       '<div class="recent-meta">',
       '<span>' + esc(item.artist || '未填写作者') + '</span>',
@@ -703,7 +695,7 @@
       var urls = [];
       snapshot.forEach(function (doc) {
         var data = doc.data() || {};
-        var url = typeof data.coverUrl === 'string' ? data.coverUrl.trim() : '';
+        var url = getItemCoverSrc(data);
         if (!url || seen[url]) return;
         seen[url] = true;
         urls.push(url);
@@ -711,6 +703,51 @@
       return urls.slice(0, 60);
     }
 
+    function getItemCoverSrc(item) {
+      if (!item) return '';
+      var direct = [
+        item.coverUrl,
+        item.cover,
+        item.coverImgUrl,
+        item.imageUrl,
+        item.image,
+        item.picUrl,
+        item.imgUrl,
+        item.artworkUrl,
+        item.thumbnail,
+        item.poster
+      ];
+      for (var i = 0; i < direct.length; i += 1) {
+        var url = normalizeImageSource(direct[i]);
+        if (url) return url;
+      }
+      var collections = [item.images, item.imageUrls, item.covers, item.pictures];
+      for (var j = 0; j < collections.length; j += 1) {
+        var found = getFirstImageSource(collections[j]);
+        if (found) return found;
+      }
+      if (item.album) {
+        return normalizeImageSource(item.album.coverUrl || item.album.cover || item.album.coverImgUrl || item.album.picUrl || item.album.imageUrl || item.album.image);
+      }
+      return '';
+    }
+
+    function getFirstImageSource(value) {
+      if (Array.isArray(value)) {
+        for (var i = 0; i < value.length; i += 1) {
+          var url = normalizeImageSource(value[i]);
+          if (url) return url;
+        }
+        return '';
+      }
+      return normalizeImageSource(value);
+    }
+
+    function normalizeImageSource(value) {
+      if (typeof value === 'string') return value.trim();
+      if (!value || typeof value !== 'object') return '';
+      return normalizeImageSource(value.url || value.src || value.href || value.coverUrl || value.cover || value.coverImgUrl || value.imageUrl || value.image || value.picUrl || value.imgUrl || value.downloadURL);
+    }
     function loadFirestoreCovers() {
       var db = initFirestore();
       if (!db) return Promise.resolve([]);
@@ -883,139 +920,6 @@
       }
     });
   }
-
-  /* ── Album-cover fluid background (amll-style, double-buffer) ── */
-  function initMusicFluidBackground() {
-    var body = document.body;
-    if (!body || !body.classList.contains('page-music')) return;
-
-    var layerA = document.getElementById('musicFluidLayerA');
-    var layerB = document.getElementById('musicFluidLayerB');
-    if (!layerA || !layerB) return;
-
-    var activeLayer = layerA;
-    var requestId = 0;
-
-    /* ── Public API ── */
-    window.updateMusicFluidPalette = function (item) {
-      var src = item && typeof item.coverUrl === 'string' ? item.coverUrl.trim() : '';
-      requestId += 1;
-      var current = requestId;
-
-      if (!src) { clearFluidOrbs(); return; }
-
-      /* Pick the inactive layer to receive new cover */
-      var incoming = (activeLayer === layerA) ? layerB : layerA;
-      var outgoing = activeLayer;
-
-      var img = new Image();
-      img.crossOrigin = 'anonymous';
-      function applyCover() {
-        if (current !== requestId) return;
-        /* Set new background on incoming orbs */
-        var orbs = incoming.querySelectorAll('.fluid-orb');
-        orbs.forEach(function (orb) {
-          orb.style.backgroundImage = 'url(' + escAttr(src) + ')';
-        });
-        incoming.offsetHeight;
-        orbs.forEach(function (orb) { orb.classList.add('loaded'); });
-
-        /* Fade out old layer */
-        var oldOrbs = outgoing.querySelectorAll('.fluid-orb');
-        oldOrbs.forEach(function (orb) { orb.classList.remove('loaded'); });
-
-        /* Swap active */
-        activeLayer = incoming;
-      }
-      img.onload = applyCover;
-      img.onerror = function () {
-        if (current === requestId) clearFluidOrbs();
-      };
-      img.src = src;
-      if (img.complete) applyCover();
-
-      /* Extract dominant colour for page background */
-      extractCoverPalette(src).then(function (palette) {
-        if (current !== requestId) return;
-        var base = palette.base || tintMusicColor(palette.colors[0]);
-        body.style.setProperty('--music-fluid-base', rgbString(base));
-      }).catch(function () {});
-    };
-
-    document.addEventListener('music:coverchange', function (event) {
-      window.updateMusicFluidPalette(event.detail || {});
-    });
-  }
-
-  function clearFluidOrbs() {
-    document.querySelectorAll('.fluid-orb').forEach(function (orb) {
-      orb.style.backgroundImage = '';
-      orb.classList.remove('loaded');
-    });
-    var body = document.body;
-    if (body) body.style.setProperty('--music-fluid-base', '#f8f3ff');
-  }
-
-  /* ── Cover palette extraction (reused for base colour) ── */
-  function extractCoverPalette(src) {
-    return new Promise(function (resolve, reject) {
-      var image = new Image();
-      image.crossOrigin = 'anonymous';
-      image.decoding = 'async';
-      image.onload = function () {
-        try {
-          var canvas = document.createElement('canvas');
-          var size = 48;
-          canvas.width = size;
-          canvas.height = size;
-          var ctx = canvas.getContext('2d', { willReadFrequently: true });
-          ctx.drawImage(image, 0, 0, size, size);
-          resolve(buildPaletteFromPixels(ctx.getImageData(0, 0, size, size).data));
-        } catch (e) { reject(e); }
-      };
-      image.onerror = reject;
-      image.src = src;
-    });
-  }
-
-  function buildPaletteFromPixels(data) {
-    var buckets = [];
-    for (var i = 0; i < data.length; i += 16) {
-      var r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-      if (a < 160) continue;
-      var max = Math.max(r, g, b), min = Math.min(r, g, b);
-      var sat = max === 0 ? 0 : (max - min) / max;
-      var bri = (r + g + b) / 3;
-      if (bri < 32 || bri > 238 || sat < 0.12) continue;
-      buckets.push({ rgb: boostMusicColor([r, g, b]), score: sat * 90 + Math.abs(bri - 150) * -0.12 + max * 0.08 });
-    }
-    buckets.sort(function (a, b) { return b.score - a.score; });
-    var colors = [];
-    buckets.forEach(function (b) {
-      if (colors.length >= 4) return;
-      if (colors.every(function (c) { return colorDistance(c, b.rgb) > 62; })) colors.push(b.rgb);
-    });
-    if (colors.length === 0) throw new Error('No usable cover colours');
-    while (colors.length < 4) colors.push(deriveCoverColor(colors[0], colors.length));
-    return { colors: colors, base: tintMusicColor(colors[0]) };
-  }
-
-  function boostMusicColor(rgb) {
-    return rgb.map(function (v) { return Math.max(30, Math.min(248, Math.round(v * 0.86 + 36))); });
-  }
-  function tintMusicColor(rgb) {
-    return rgb.map(function (v) { return Math.round(v * 0.38 + 255 * 0.62); });
-  }
-  function colorDistance(a, b) {
-    var dr = a[0] - b[0], dg = a[1] - b[1], db = a[2] - b[2];
-    return Math.sqrt(dr * dr + dg * dg + db * db);
-  }
-  function deriveCoverColor(rgb, index) {
-    var mixes = [[255, 255, 255, 0.24], [0, 0, 0, 0.18], [255 - rgb[0], 255 - rgb[1], 255 - rgb[2], 0.16]];
-    var mix = mixes[(index - 1) % mixes.length];
-    return rgb.map(function (v, i) { return Math.max(24, Math.min(255, Math.round(v * (1 - mix[3]) + mix[i] * mix[3]))); });
-  }
-  function rgbString(rgb) { return 'rgb(' + rgb.join(', ') + ')'; }
   function initMusicPlayer() {
     var playBtn = document.querySelector('.music-play');
     var coverImg = document.querySelector('.music-cover img');
