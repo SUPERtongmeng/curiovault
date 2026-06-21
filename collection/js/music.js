@@ -425,6 +425,7 @@
 
     function toggleLyricsView() {
       isLyricsView = !isLyricsView;
+      lastLyricIndex = -1;
       hideMusicHoverCard(hoverCard);
       queue.classList.toggle('is-lyrics-view', isLyricsView);
       if (isLyricsView) queue.scrollTop = 0;
@@ -444,10 +445,12 @@
       if (!panel || !key) return;
       var cached = lyricsCache.get(key);
       if (cached) {
+        lastLyricIndex = -1;
         renderQueueLyrics(panel, cached, audio.currentTime || 0, getPlaybackDuration());
         return;
       }
       panel.innerHTML = renderQueueLyricsStatus('\u6b63\u5728\u52a0\u8f7d\u6b4c\u8bcd');
+      lastLyricIndex = -1;
       fetch(getLyricsEndpoint(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -460,11 +463,11 @@
       }).then(function (data) {
         var result = normalizeLyricsResult(data);
         lyricsCache.set(key, result);
-        if (isLyricsView) renderQueueLyrics(panel, result, audio.currentTime || 0, getPlaybackDuration());
+        if (isLyricsView) { lastLyricIndex = -1; renderQueueLyrics(panel, result, audio.currentTime || 0, getPlaybackDuration()); }
       }).catch(function (error) {
         var fallback = { lines: [], message: getLyricsErrorMessage(error) };
         lyricsCache.set(key, fallback);
-        if (isLyricsView) renderQueueLyrics(panel, fallback, audio.currentTime || 0, getPlaybackDuration());
+        if (isLyricsView) { lastLyricIndex = -1; renderQueueLyrics(panel, fallback, audio.currentTime || 0, getPlaybackDuration()); }
       });
     }
 
@@ -476,13 +479,27 @@
       return message || '\u6682\u65e0\u6b4c\u8bcd';
     }
 
+    var lastLyricIndex = -1;
+
     function updateQueueLyrics(elapsed, duration) {
       if (!isLyricsView) return;
       var panel = queue.querySelector('.music-lyrics-view');
       var key = getLyricsKey(items[selectedIndex]);
       var result = key ? lyricsCache.get(key) : null;
       if (!panel || !result) return;
-      renderQueueLyrics(panel, result, elapsed, duration);
+      var lines = result.lines || [];
+      if (!lines.length) return;
+      var activeIndex = getActiveLyricIndex(lines, elapsed);
+      if (activeIndex !== lastLyricIndex || !panel.querySelector('.queue-lyrics-lines:not(.queue-lyrics-status)')) {
+        lastLyricIndex = activeIndex;
+        renderQueueLyrics(panel, result, elapsed, duration);
+        return;
+      }
+      var progressBar = panel.querySelector('.queue-lyrics-progress span');
+      if (progressBar && duration) {
+        var ratio = Math.max(0, Math.min(1, elapsed / duration));
+        progressBar.style.width = (ratio * 100).toFixed(2) + '%';
+      }
     }
 
     function normalizeLyricsResult(data) {
