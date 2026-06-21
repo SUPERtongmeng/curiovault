@@ -554,12 +554,8 @@ body.page-music {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
   scrollbar-gutter: stable;
-  mask-image:
-    linear-gradient(to right, black 0%, black calc(100% - 60px), transparent 100%),
-    linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 28px), transparent 100%);
-  -webkit-mask-image:
-    linear-gradient(to right, black 0%, black calc(100% - 60px), transparent 100%),
-    linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 28px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 28px), transparent 100%);
 }
 
 .music-track-list {
