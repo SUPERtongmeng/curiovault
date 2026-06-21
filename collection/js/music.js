@@ -435,6 +435,7 @@
       isLyricsView = true;
       lastLyricIndex = -1;
       hideMusicHoverCard(hoverCard);
+      queue.scrollTop = 0;
       queue.classList.add('is-lyrics-view');
       updateLyricsToggle();
       loadLyricsForSelected();
