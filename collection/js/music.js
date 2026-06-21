@@ -358,16 +358,20 @@
       return String(Math.max(0, Math.floor(value || 0))).padStart(2, '0');
     }
 
+    var loadedSrc = '';
+
     function loadSelectedAudio(shouldPlay) {
       var src = getAudioSrc(items[selectedIndex]);
       if (!src) {
         audio.removeAttribute('src');
+        loadedSrc = '';
         audio.load();
         isPlaying = false;
         return;
       }
-      if (audio.src !== src) {
+      if (loadedSrc !== src) {
         audio.src = src;
+        loadedSrc = src;
         audio.load();
       }
       if (shouldPlay) playAudio();
@@ -376,7 +380,7 @@
     function togglePlayback() {
       var src = getAudioSrc(items[selectedIndex]);
       if (!src) return;
-      if (audio.src !== src) loadSelectedAudio(false);
+      if (loadedSrc !== src) loadSelectedAudio(false);
       if (audio.paused) {
         playAudio();
         return;
