@@ -435,6 +435,7 @@
       hideMusicHoverCard(hoverCard);
       if (isLyricsView) {
         savedQueueScroll = queue.scrollTop;
+        queue.scrollTop = 0;
         queue.classList.add('is-lyrics-view');
       } else {
         queue.scrollTop = savedQueueScroll;
