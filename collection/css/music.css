@@ -595,6 +595,10 @@ body.page-music {
   transition-delay: 0s;
 }
 
+.music-queue.is-lyrics-view {
+  overflow-y: hidden;
+}
+
 .music-queue.is-lyrics-view .music-track {
   transform: translate3d(96px, 0, 0);
   opacity: 0;
