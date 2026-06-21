@@ -562,7 +562,8 @@ body.page-music {
   display: grid;
   align-content: start;
   gap: 10px;
-  transition: opacity 0.28s ease;
+  transform: translate3d(0, 0, 0);
+  transition: opacity 0.28s ease, transform 0.52s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .music-queue::-webkit-scrollbar {
@@ -600,13 +601,12 @@ body.page-music {
 }
 
 .music-queue.is-lyrics-view .music-track {
-  transform: translate3d(96px, 0, 0);
   opacity: 0;
-  transition-delay: var(--row-delay, 0ms);
 }
 
 .music-queue.is-lyrics-view .music-track-list {
   pointer-events: none;
+  transform: translate3d(96px, 0, 0);
 }
 
 .music-track:hover,
