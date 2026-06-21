@@ -427,14 +427,24 @@
       updateQueueLyrics(elapsed, duration);
     }
 
+    var savedQueueScroll = 0;
+
     function toggleLyricsView() {
       isLyricsView = !isLyricsView;
       lastLyricIndex = -1;
       hideMusicHoverCard(hoverCard);
-      queue.classList.toggle('is-lyrics-view', isLyricsView);
-      if (isLyricsView) queue.scrollTop = 0;
+      if (isLyricsView) {
+        savedQueueScroll = queue.scrollTop;
+        queue.scrollTop = 0;
+        queue.classList.add('is-lyrics-view');
+      } else {
+        queue.scrollTop = savedQueueScroll;
+        queue.classList.remove('is-lyrics-view');
+      }
       updateLyricsToggle();
-      if (isLyricsView) loadLyricsForSelected();
+      if (isLyricsView) {
+        loadLyricsForSelected();
+      }
     }
 
     function updateLyricsToggle() {
