@@ -200,6 +200,7 @@
     }
 
     queue.innerHTML = [
+      '<div class="music-track-scroll">',
       '<div class="music-track-list">',
       items.map(function (item, index) {
         return [
@@ -210,6 +211,7 @@
           '</article>'
         ].join('');
       }).join(''),
+      '</div>',
       '</div>',
       '<div class="music-lyrics-view" aria-live="polite">' + renderQueueLyricsStatus('歌词') + '</div>'
     ].join('');
@@ -428,34 +430,12 @@
     }
 
     function toggleLyricsView() {
-      if (isLyricsView) {
-        exitLyricsView();
-        return;
-      }
-      isLyricsView = true;
+      isLyricsView = !isLyricsView;
       lastLyricIndex = -1;
       hideMusicHoverCard(hoverCard);
-      queue.scrollTop = 0;
-      queue.classList.add('is-lyrics-view');
+      queue.classList.toggle('is-lyrics-view', isLyricsView);
       updateLyricsToggle();
-      loadLyricsForSelected();
-    }
-
-    function exitLyricsView() {
-      isLyricsView = false;
-      var trackList = queue.querySelector('.music-track-list');
-      if (trackList) {
-        trackList.style.transform = 'translate3d(0, 0, 0)';
-        trackList.addEventListener('transitionend', function onEnd(event) {
-          if (event.propertyName !== 'transform') return;
-          trackList.removeEventListener('transitionend', onEnd);
-          trackList.style.transform = '';
-          queue.classList.remove('is-lyrics-view');
-        });
-      } else {
-        queue.classList.remove('is-lyrics-view');
-      }
-      updateLyricsToggle();
+      if (isLyricsView) loadLyricsForSelected();
     }
 
     function updateLyricsToggle() {
