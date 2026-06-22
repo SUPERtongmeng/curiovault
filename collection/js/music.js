@@ -647,6 +647,7 @@
       positionedLines.forEach(function (line) {
         var element = line.element;
         var state = getLyricAnimationState(element, line.y);
+        var cascadeDelay = getLyricCascadeDelay(element);
         element.classList.add('is-gsap-animated');
         element.style.setProperty('--line-y', line.y + 'px');
         promotePendingCurrentLyric(element);
@@ -659,35 +660,47 @@
         });
         gsap.to(element, {
           y: line.y,
-          duration: state.isCurrent ? 0.66 : 0.54,
-          ease: state.isCurrent ? 'expo.out' : 'power4.out',
+          duration: state.isCurrent ? 0.46 : cascadeDelay ? 0.68 : 0.54,
+          delay: cascadeDelay,
+          ease: state.isCurrent ? 'power2.out' : cascadeDelay ? 'power3.out' : 'power4.out',
           overwrite: 'auto',
           force3D: true
         });
         gsap.to(element, {
           scale: state.toScale,
-          duration: state.isCurrent ? 0.74 : 0.46,
-          ease: state.isCurrent ? 'back.out(1.12)' : 'power3.out',
+          duration: state.isCurrent ? 0.50 : 0.46,
+          delay: cascadeDelay * 0.72,
+          ease: state.isCurrent ? 'power2.out' : 'power3.out',
           overwrite: 'auto',
           force3D: true
         });
         gsap.to(element, {
           opacity: state.toOpacity,
-          duration: state.isCurrent ? 0.42 : 0.34,
-          ease: 'sine.out',
+          duration: state.isCurrent ? 0.30 : 0.34,
+          delay: cascadeDelay * 0.55,
+          ease: state.isCurrent ? 'sine.out' : 'sine.out',
           overwrite: 'auto'
         });
       });
     }
 
+    function getLyricCascadeDelay(element) {
+      var offset = Number(element.getAttribute('data-line-offset'));
+      if (!Number.isFinite(offset) || offset <= 0) return 0;
+      return Math.min(offset, 5) * 0.045;
+    }
+
     function getLyricAnimationState(element, targetY) {
       var isCurrent = element.classList.contains('is-current') || element.classList.contains('is-pending-current');
+      var targetScale = isCurrent ? CURRENT_LYRIC_SCALE : getLyricTargetScale(element);
+      var fromScale = readNumber(element.dataset.prevScale, isCurrent ? 1.04 : targetScale);
+      if (isCurrent && fromScale > targetScale) fromScale = targetScale;
       return {
         isCurrent: isCurrent,
         fromY: readNumber(element.dataset.prevY, targetY),
-        fromScale: readNumber(element.dataset.prevScale, isCurrent ? 1.04 : getLyricTargetScale(element)),
+        fromScale: fromScale,
         fromOpacity: readNumber(element.dataset.prevOpacity, isCurrent ? 0.62 : getLyricTargetOpacity(element)),
-        toScale: isCurrent ? CURRENT_LYRIC_SCALE : getLyricTargetScale(element),
+        toScale: targetScale,
         toOpacity: isCurrent ? 1 : getLyricTargetOpacity(element)
       };
     }

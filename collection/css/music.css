@@ -676,6 +676,10 @@ body.page-music {
   transition-delay: 0s;
 }
 
+.music-queue.is-lyrics-view {
+  overflow: visible;
+}
+
 .music-queue.is-lyrics-view .music-track {
   opacity: 0;
   transition-delay: 0ms;
@@ -741,8 +745,9 @@ body.page-music {
 }
 
 .music-lyrics-view {
+  --lyrics-right-overflow: 320px;
   position: absolute;
-  inset: 30px 10px 48px 52px;
+  inset: 30px calc(10px - var(--lyrics-right-overflow)) 48px 52px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -770,8 +775,8 @@ body.page-music {
   min-height: 0;
   flex: 1 1 auto;
   transform: translate3d(0, 0, 0);
-  mask-image: linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 28px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 46px, black calc(100% - 46px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 46px, black calc(100% - 46px), transparent 100%);
 }
 
 .queue-lyric-line {
@@ -780,7 +785,7 @@ body.page-music {
   position: absolute;
   top: 27%;
   left: 0;
-  right: 0;
+  right: var(--lyrics-right-overflow);
   margin: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
