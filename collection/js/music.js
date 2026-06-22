@@ -20,7 +20,7 @@
     var audio = new Audio();
     var isPlaying = false;
     var isLyricsView = false;
-    var isTranslationVisible = true;
+    var isTranslationVisible = false;
     var preloadedCovers = new Map();
     var lyricsCache = new Map();
     var hasScheduledCoverWarmup = false;
@@ -452,7 +452,7 @@
     }
 
     function toggleTranslationView() {
-      if (!isLyricsView) return;
+      if (!isLyricsView || !hasSelectedLyricTranslation()) return;
       isTranslationVisible = !isTranslationVisible;
       updateTranslationToggle();
     }
@@ -460,11 +460,26 @@
     function updateTranslationToggle() {
       var button = feature.querySelector('[data-music-action="translation"]');
       if (!button) return;
-      button.classList.toggle('is-visible', isLyricsView);
-      button.setAttribute('aria-hidden', isLyricsView ? 'false' : 'true');
-      button.tabIndex = isLyricsView ? 0 : -1;
+      var canShow = isLyricsView && hasSelectedLyricTranslation();
+      if (!canShow) isTranslationVisible = false;
+      button.classList.toggle('is-visible', canShow);
+      button.setAttribute('aria-hidden', canShow ? 'false' : 'true');
+      button.tabIndex = canShow ? 0 : -1;
       button.setAttribute('aria-pressed', isTranslationVisible ? 'true' : 'false');
       queue.classList.toggle('is-translation-hidden', !isTranslationVisible);
+      if (isLyricsView) settleQueueLyricPositions(queue.querySelector('.music-lyrics-view'));
+    }
+
+    function hasSelectedLyricTranslation() {
+      var result = getSelectedLyricsResult();
+      return Boolean(result && Array.isArray(result.lines) && result.lines.some(function (line) {
+        return line && String(line.translation || '').trim();
+      }));
+    }
+
+    function getSelectedLyricsResult() {
+      var key = getLyricsKey(items[selectedIndex]);
+      return key ? lyricsCache.get(key) : null;
     }
 
     function loadLyricsForSelected() {
@@ -476,10 +491,12 @@
       if (cached) {
         lastLyricIndex = -1;
         renderQueueLyrics(panel, cached, audio.currentTime || 0, getPlaybackDuration());
+        updateTranslationToggle();
         return;
       }
       panel.innerHTML = renderQueueLyricsStatus('\u6b63\u5728\u52a0\u8f7d\u6b4c\u8bcd');
       lastLyricIndex = -1;
+      updateTranslationToggle();
       fetch(getLyricsEndpoint(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -492,11 +509,11 @@
       }).then(function (data) {
         var result = normalizeLyricsResult(data);
         lyricsCache.set(key, result);
-        if (isLyricsView) { lastLyricIndex = -1; renderQueueLyrics(panel, result, audio.currentTime || 0, getPlaybackDuration()); }
+        if (isLyricsView) { lastLyricIndex = -1; renderQueueLyrics(panel, result, audio.currentTime || 0, getPlaybackDuration()); updateTranslationToggle(); }
       }).catch(function (error) {
         var fallback = { lines: [], message: getLyricsErrorMessage(error) };
         lyricsCache.set(key, fallback);
-        if (isLyricsView) { lastLyricIndex = -1; renderQueueLyrics(panel, fallback, audio.currentTime || 0, getPlaybackDuration()); }
+        if (isLyricsView) { lastLyricIndex = -1; renderQueueLyrics(panel, fallback, audio.currentTime || 0, getPlaybackDuration()); updateTranslationToggle(); }
       });
     }
 
@@ -509,6 +526,8 @@
     }
 
     var lastLyricIndex = -1;
+    var LYRIC_LINE_GUTTER = 34;
+    var CURRENT_LYRIC_SCALE = 1.1;
 
     function updateQueueLyrics(elapsed, duration) {
       if (!isLyricsView) return;
@@ -552,43 +571,177 @@
         return;
       }
       var activeIndex = getActiveLyricIndex(lines, elapsed);
+      var previousLineStates = getCurrentLyricLineStates(panel);
       var windowLines = getLyricWindow(lines, activeIndex);
       panel.innerHTML = [
         '<div class="queue-lyrics-lines" style="--active-line:' + activeIndex + '">',
         windowLines.map(function (line, index) {
           var distance = line.sourceIndex - activeIndex;
           var distanceAbs = Math.abs(distance);
-          var className = 'queue-lyric-line' + (distance === 0 ? ' is-current' : distance < 0 ? ' is-before' : ' is-after');
-          var primary = renderLyricPrimary(line.text, distance === 0);
+          var previousState = previousLineStates.get(line.sourceIndex);
+          var previousPhase = previousState && previousState.phase;
+          var nextPhase = distance === 0 ? 'current' : distance < 0 ? 'before' : 'after';
+          var initialPhase = nextPhase === 'current' && previousPhase && previousPhase !== 'current' ? previousPhase : nextPhase;
+          var className = 'queue-lyric-line is-' + initialPhase + (initialPhase !== nextPhase ? ' is-pending-current' : '');
+          var primary = renderLyricPrimary(line.text);
+          var previousY = previousState && previousState.y;
+          var initialY = Number.isFinite(previousY) ? previousY : distance * 158;
           var lineStyle = [
             '--line-index:' + index,
             '--line-delay:' + ((8 - index) * 34) + 'ms',
             '--line-distance:' + distanceAbs,
+            '--line-offset:' + distance,
+            '--line-y:' + initialY + 'px',
             '--line-shift:0px',
             '--line-scale:' + (1 - Math.min(distanceAbs, 4) * 0.035).toFixed(3),
             '--line-opacity:' + Math.max(0.22, 0.74 - distanceAbs * 0.13).toFixed(2)
           ].join(';');
-          return '<p class="' + className + '" style="' + lineStyle + '">' + primary + (line.translation ? '<span class="queue-lyric-translation">' + esc(line.translation) + '</span>' : '') + '</p>';
+          return '<p class="' + className + '" data-source-index="' + line.sourceIndex + '" data-line-offset="' + distance + '" data-prev-y="' + initialY + '" data-prev-scale="' + (previousState && Number.isFinite(previousState.scale) ? previousState.scale : (initialPhase === 'current' ? CURRENT_LYRIC_SCALE : (1 - Math.min(distanceAbs, 4) * 0.035).toFixed(3))) + '" data-prev-opacity="' + (previousState && Number.isFinite(previousState.opacity) ? previousState.opacity : (initialPhase === 'current' ? 1 : Math.max(0.22, 0.74 - distanceAbs * 0.13).toFixed(2))) + '" style="' + lineStyle + '">' + primary + (line.translation ? '<span class="queue-lyric-translation">' + esc(line.translation) + '</span>' : '') + '</p>';
         }).join(''),
         '</div>'
       ].join('');
+      panel.dataset.activeIndex = String(activeIndex);
+      settleQueueLyricPositions(panel);
     }
 
-    function renderLyricPrimary(text, isCurrent) {
-      if (!isCurrent || !shouldSplitLyricWords(text)) return '<span class="queue-lyric-primary">' + esc(text) + '</span>';
-      return '<span class="queue-lyric-primary">' + splitLyricTokens(text).map(function (token, index) {
-        return '<span class="queue-lyric-word" style="--word-index:' + index + ';--word-delay:' + (index * 18) + 'ms">' + esc(token) + '</span>';
-      }).join('') + '</span>';
+    function getCurrentLyricLineStates(panel) {
+      var states = new Map();
+      if (!panel) return states;
+      panel.querySelectorAll('.queue-lyric-line[data-source-index]').forEach(function (line) {
+        var sourceIndex = Number(line.getAttribute('data-source-index'));
+        var gsap = getGsap();
+        var y = gsap && line.classList.contains('is-gsap-animated') ? Number(gsap.getProperty(line, 'y')) : parseFloat(line.style.getPropertyValue('--line-y'));
+        var phase = line.classList.contains('is-current') ? 'current' : line.classList.contains('is-before') ? 'before' : 'after';
+        var scale = gsap && line.classList.contains('is-gsap-animated') ? Number(gsap.getProperty(line, 'scale')) : parseFloat(line.style.getPropertyValue('--line-scale'));
+        var opacity = gsap && line.classList.contains('is-gsap-animated') ? Number(gsap.getProperty(line, 'opacity')) : parseFloat(window.getComputedStyle(line).opacity);
+        if (Number.isFinite(sourceIndex)) {
+          states.set(sourceIndex, {
+            y: Number.isFinite(y) ? y : 0,
+            phase: phase,
+            scale: Number.isFinite(scale) ? scale : 1,
+            opacity: Number.isFinite(opacity) ? opacity : 1
+          });
+        }
+      });
+      return states;
     }
 
-    function shouldSplitLyricWords(text) {
-      return /[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(String(text || ''));
+    function settleQueueLyricPositions(panel) {
+      if (!panel || !window.requestAnimationFrame) return;
+      window.requestAnimationFrame(function () {
+        var positionedLines = getMeasuredLyricLinePositions(panel);
+        panel.offsetHeight;
+        var gsap = getGsap();
+        if (gsap && !prefersReducedMotion()) {
+          animateQueueLyricPositions(gsap, positionedLines);
+          return;
+        }
+        positionedLines.forEach(function (line) {
+          line.element.style.setProperty('--line-y', line.y + 'px');
+          promotePendingCurrentLyric(line.element);
+        });
+      });
     }
 
-    function splitLyricTokens(text) {
-      var value = String(text || '');
-      if (!value.trim()) return [''];
-      return Array.from(value);
+    function animateQueueLyricPositions(gsap, positionedLines) {
+      positionedLines.forEach(function (line) {
+        var element = line.element;
+        var state = getLyricAnimationState(element, line.y);
+        element.classList.add('is-gsap-animated');
+        element.style.setProperty('--line-y', line.y + 'px');
+        promotePendingCurrentLyric(element);
+        gsap.killTweensOf(element);
+        gsap.set(element, {
+          y: state.fromY,
+          scale: state.fromScale,
+          opacity: state.fromOpacity,
+          force3D: true
+        });
+        gsap.to(element, {
+          y: line.y,
+          duration: state.isCurrent ? 0.66 : 0.54,
+          ease: state.isCurrent ? 'expo.out' : 'power4.out',
+          overwrite: 'auto',
+          force3D: true
+        });
+        gsap.to(element, {
+          scale: state.toScale,
+          duration: state.isCurrent ? 0.74 : 0.46,
+          ease: state.isCurrent ? 'back.out(1.12)' : 'power3.out',
+          overwrite: 'auto',
+          force3D: true
+        });
+        gsap.to(element, {
+          opacity: state.toOpacity,
+          duration: state.isCurrent ? 0.42 : 0.34,
+          ease: 'sine.out',
+          overwrite: 'auto'
+        });
+      });
+    }
+
+    function getLyricAnimationState(element, targetY) {
+      var isCurrent = element.classList.contains('is-current') || element.classList.contains('is-pending-current');
+      return {
+        isCurrent: isCurrent,
+        fromY: readNumber(element.dataset.prevY, targetY),
+        fromScale: readNumber(element.dataset.prevScale, isCurrent ? 1.04 : getLyricTargetScale(element)),
+        fromOpacity: readNumber(element.dataset.prevOpacity, isCurrent ? 0.62 : getLyricTargetOpacity(element)),
+        toScale: isCurrent ? CURRENT_LYRIC_SCALE : getLyricTargetScale(element),
+        toOpacity: isCurrent ? 1 : getLyricTargetOpacity(element)
+      };
+    }
+
+    function promotePendingCurrentLyric(element) {
+      if (!element.classList.contains('is-pending-current')) return;
+      element.classList.remove('is-before', 'is-after', 'is-pending-current');
+      element.classList.add('is-current');
+    }
+
+    function getLyricTargetScale(element) {
+      return readNumber(element.style.getPropertyValue('--line-scale'), 1);
+    }
+
+    function getLyricTargetOpacity(element) {
+      return readNumber(element.style.getPropertyValue('--line-opacity'), 0.38);
+    }
+
+    function getGsap() {
+      return window.gsap && typeof window.gsap.fromTo === 'function' ? window.gsap : null;
+    }
+
+    function prefersReducedMotion() {
+      return Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    }
+
+    function readNumber(value, fallback) {
+      var number = parseFloat(value);
+      return Number.isFinite(number) ? number : fallback;
+    }
+
+    function getMeasuredLyricLinePositions(panel) {
+      var lyricLines = Array.from(panel.querySelectorAll('.queue-lyric-line[data-line-offset]'));
+      var currentIndex = lyricLines.findIndex(function (line) { return line.classList.contains('is-current') || line.classList.contains('is-pending-current'); });
+      if (currentIndex < 0) return [];
+      var positioned = lyricLines.map(function (line) { return { element: line, y: 0, height: getLyricLineHeight(line) }; });
+      for (var after = currentIndex + 1; after < positioned.length; after += 1) {
+        var previous = positioned[after - 1];
+        positioned[after].y = previous.y + previous.height + LYRIC_LINE_GUTTER;
+      }
+      for (var before = currentIndex - 1; before >= 0; before -= 1) {
+        var next = positioned[before + 1];
+        positioned[before].y = next.y - LYRIC_LINE_GUTTER - positioned[before].height;
+      }
+      return positioned;
+    }
+
+    function getLyricLineHeight(line) {
+      var height = Math.max(1, line.offsetHeight || line.getBoundingClientRect().height || 1);
+      return line.classList.contains('is-current') || line.classList.contains('is-pending-current') ? height * CURRENT_LYRIC_SCALE : height;
+    }
+
+    function renderLyricPrimary(text) {
+      return '<span class="queue-lyric-primary">' + esc(text) + '</span>';
     }
 
     function renderQueueLyricsStatus(message) {

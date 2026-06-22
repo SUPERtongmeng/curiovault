@@ -742,13 +742,13 @@ body.page-music {
 
 .music-lyrics-view {
   position: absolute;
-  inset: 0 10px 18px 52px;
+  inset: 30px 10px 48px 52px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 18px;
-  padding: 26px 26px 38px 0;
+  padding: 4px 26px 8px 0;
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
@@ -764,36 +764,47 @@ body.page-music {
 }
 
 .queue-lyrics-lines {
-  display: flex;
+  position: relative;
+  z-index: 1;
+  display: block;
   min-height: 0;
   flex: 1 1 auto;
-  flex-direction: column;
-  justify-content: center;
-  gap: clamp(8px, 1.4vh, 16px);
   transform: translate3d(0, 0, 0);
+  mask-image: linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 28px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 28px), transparent 100%);
 }
 
 .queue-lyric-line {
   --line-distance: 4;
+  --line-scale: 1;
+  position: absolute;
+  top: 27%;
+  left: 0;
+  right: 0;
   margin: 0;
   max-width: 100%;
+  overflow-wrap: anywhere;
   color: rgba(255, 255, 255, 0.38);
-  font-size: clamp(1.02rem, 1.35vw, 1.28rem);
+  font-size: clamp(2.04rem, 4.35vw, 3.82rem);
   line-height: 1.16;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0;
   opacity: 0;
-  filter: blur(0.4px);
-  transform: translate3d(-22px, 0, 0) scale(0.96);
-  transform-origin: left center;
-  transition: transform 0.52s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.34s ease, color 0.24s ease, filter 0.24s ease;
-  transition-delay: var(--line-delay, 0ms);
+  background: transparent;
+  transform: translate3d(-22px, var(--line-y, 0px), 0) scale(0.96);
+  transform-origin: left top;
+  transition: transform 0.78s cubic-bezier(0.18, 1.18, 0.24, 1), opacity 0.42s ease, color 0.28s ease;
+  transition-delay: 0ms;
   will-change: transform, opacity;
 }
 
 .music-queue.is-lyrics-view .queue-lyric-line {
   opacity: var(--line-opacity, 0.38);
-  transform: translate3d(var(--line-shift, -12px), 0, 0) scale(var(--line-scale, 0.9));
+  transform: translate3d(var(--line-shift, -12px), var(--line-y, 0px), 0) scale(var(--line-scale, 0.9));
+}
+
+.queue-lyric-line.is-gsap-animated {
+  transition: color 0.28s ease;
 }
 
 .music-queue.is-lyrics-view .queue-lyric-line.is-before {
@@ -805,45 +816,36 @@ body.page-music {
 }
 
 .queue-lyric-line.is-current {
+  z-index: 2;
   color: rgba(255, 255, 255, 0.98);
-  font-size: clamp(1.7rem, 3.9vw, 3.35rem);
   font-weight: 850;
   opacity: 0;
-  filter: none;
-  text-shadow: 0 12px 36px rgba(0, 0, 0, 0.26);
+  text-shadow: none;
 }
 
 .music-queue.is-lyrics-view .queue-lyric-line.is-current {
   opacity: 1;
-  transform: translate3d(0, 0, 0) scale(1);
+  transform: translate3d(0, var(--line-y, 0px), 0) scale(1.1);
 }
 
 .queue-lyric-primary {
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.queue-lyric-word {
-  display: inline-block;
-  transform: translate3d(0, 0.18em, 0) scale(0.985);
-  opacity: 0;
-  animation: lyricWordLift 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-  animation-delay: var(--word-delay, 0ms);
-  will-change: transform, opacity;
+  display: inline;
+  background: transparent;
+  box-shadow: none;
+  text-decoration: none;
 }
 
 .queue-lyric-translation {
   display: block;
-  margin-top: 8px;
+  margin-top: 10px;
   color: rgba(255, 255, 255, 0.46);
-  font-size: clamp(0.72rem, 1.1vw, 1rem);
+  font-size: clamp(1.08rem, 1.65vw, 1.5rem);
   font-weight: 600;
   line-height: 1.25;
 }
 
 .queue-lyric-line.is-current .queue-lyric-translation {
   color: rgba(255, 255, 255, 0.68);
-  font-size: clamp(0.86rem, 1.22vw, 1.08rem);
 }
 
 .music-queue.is-translation-hidden .queue-lyric-translation {
@@ -857,17 +859,6 @@ body.page-music {
 .queue-lyrics-status .queue-lyric-line {
   --line-index: 8;
   color: rgba(255, 255, 255, 0.9);
-}
-
-@keyframes lyricWordLift {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 0.22em, 0) scale(0.98);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
 }
 
 .music-hover-card {
