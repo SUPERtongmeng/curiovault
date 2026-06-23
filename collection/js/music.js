@@ -26,18 +26,22 @@
     var pendingLyricsRequests = new Map();
     var hasScheduledCoverWarmup = false;
     var hoverCard = getMusicHoverCard();
+    var playbackFrameId = 0;
 
     audio.addEventListener('ended', function () {
+      stopPlaybackSync();
       playNextAfterEnded();
     });
 
     audio.addEventListener('pause', function () {
       isPlaying = false;
+      stopPlaybackSync();
       updatePlaybackUi();
     });
 
     audio.addEventListener('play', function () {
       isPlaying = true;
+      startPlaybackSync();
       updatePlaybackUi();
     });
 
@@ -46,7 +50,7 @@
 
     function renderSelectedMusic(item, animateInfo) {
       feature.innerHTML = [
-        '<div class="music-player-content' + (animateInfo ? ' is-switching' : '') + '">',
+        '<div class="music-player-content' + (isPlaying ? ' is-playing' : ' is-paused') + (animateInfo ? ' is-switching' : '') + '">',
         '<div class="music-player-cover">' + coverImg(item, { loading: 'eager' }) + '</div>',
         '<div class="music-player-meta">',
         '<h1>' + esc(item.title || '未命名音乐') + '</h1>',
@@ -61,6 +65,52 @@
         '<div class="music-player-time" aria-live="off"><time data-time-current>00:00</time><time data-time-remaining>-00:00</time></div>',
         '</div>'
       ].join('');
+      if (animateInfo) {
+        animatePlayerTextSwitch();
+        clearMusicSwitchingState();
+      }
+    }
+
+    function clearMusicSwitchingState() {
+      window.setTimeout(function () {
+        var content = feature.querySelector('.music-player-content.is-switching');
+        if (content) content.classList.remove('is-switching');
+      }, 560);
+    }
+
+    function animatePlayerTextSwitch() {
+      var gsap = getGsap();
+      var title = feature.querySelector('.music-player-meta h1');
+      var artist = feature.querySelector('.music-player-artist span');
+      var targets = [title, artist].filter(Boolean);
+      if (!targets.length) return;
+      if (!gsap || prefersReducedMotion()) {
+        targets.forEach(function (target) {
+          target.style.opacity = '';
+          target.style.transform = '';
+          target.style.filter = '';
+        });
+        return;
+      }
+      gsap.killTweensOf(targets);
+      gsap.set(targets, {
+        autoAlpha: 0,
+        y: 12,
+        scale: 0.985,
+        filter: 'blur(7px)',
+        transformOrigin: 'left center'
+      });
+      gsap.to(targets, {
+        autoAlpha: 1,
+        y: 0,
+        scale: 1,
+        filter: 'blur(0px)',
+        duration: 0.54,
+        stagger: 0.065,
+        ease: 'power3.out',
+        overwrite: true,
+        clearProps: 'transform,filter,opacity,visibility'
+      });
     }
 
     function applyDistances(centerIndex) {
@@ -453,8 +503,30 @@
       updatePlaybackUi();
       audio.play().catch(function () {
         isPlaying = false;
+        stopPlaybackSync();
         updatePlaybackUi();
       });
+    }
+
+    function startPlaybackSync() {
+      if (playbackFrameId || !window.requestAnimationFrame) return;
+      playbackFrameId = window.requestAnimationFrame(syncPlaybackFrame);
+    }
+
+    function stopPlaybackSync() {
+      if (!playbackFrameId || !window.cancelAnimationFrame) {
+        playbackFrameId = 0;
+        return;
+      }
+      window.cancelAnimationFrame(playbackFrameId);
+      playbackFrameId = 0;
+    }
+
+    function syncPlaybackFrame() {
+      playbackFrameId = 0;
+      if (!isPlaying || audio.paused || audio.ended) return;
+      updatePlaybackUi();
+      startPlaybackSync();
     }
 
     function updatePlaybackUi() {
@@ -471,6 +543,11 @@
           playBtn.innerHTML = isPlaying ? iconPause() : iconPlay();
           playBtn.dataset.iconState = iconState;
         }
+      }
+      var playerContent = feature.querySelector('.music-player-content');
+      if (playerContent) {
+        playerContent.classList.toggle('is-playing', isPlaying);
+        playerContent.classList.toggle('is-paused', !isPlaying);
       }
       var duration = getPlaybackDuration();
       var elapsed = Math.max(0, audio.currentTime || 0);
@@ -1291,9 +1368,3 @@
     return esc(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 })();
-
-
-
-
-
-

@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "check": "node --check admin/js/admin.js && node --check api/autofillCollectionItem.js && node --check api/musicLyrics.js && node --check collection/js/common.js && node --check collection/js/list-loader.js && node --check scripts/test-autofill-parser.js && npm run test:autofill",
+    "check": "node --check admin/js/admin.js && node --check api/autofillCollectionItem.js && node --check api/musicLyrics.js && node --check collection/js/common.js && node --check collection/js/music.js && node --check collection/js/list-loader.js && node --check scripts/test-autofill-parser.js && npm run test:autofill",
     "test:autofill": "node scripts/test-autofill-parser.js"
   }
 }

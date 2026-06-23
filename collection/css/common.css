@@ -1912,6 +1912,10 @@ body.nav-menu-open {
 
 /* ===== Mobile Responsive ===== */
 @media (max-width: 768px) {
+  body {
+    min-height: 100svh;
+  }
+
   nav {
     justify-content: center;
     padding: 0 14px;
@@ -1977,6 +1981,49 @@ body.nav-menu-open {
     letter-spacing: 3px;
   }
 
+  .home-hero {
+    width: min(100% - 32px, 640px);
+    padding-top: 92px;
+  }
+
+  .home-hero .hero-title-main {
+    margin-top: 0;
+    font-size: clamp(2.65rem, 15vw, 4.3rem);
+    line-height: 0.98;
+    letter-spacing: 1px;
+  }
+
+  .home-hero .hero-sub-main {
+    max-width: 100%;
+    margin-top: 12px;
+    font-size: 0.94rem;
+    line-height: 1.65;
+  }
+
+  .hero-stats {
+    width: 100%;
+    margin-top: 20px;
+  }
+
+  .hero-total {
+    gap: 10px;
+  }
+
+  .home-hero .hero-cats {
+    width: 100%;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    margin-top: 16px;
+  }
+
+  .home-hero .hero-cat {
+    padding: 0 6px;
+  }
+
+  .home-hero .music-card {
+    width: min(100%, 380px);
+    margin-top: 20px;
+  }
+
   .section {
     padding: 3rem 1.2rem;
   }
@@ -1989,8 +2036,13 @@ body.nav-menu-open {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .category-showcase {
+    margin-top: 56px;
+  }
+
   .category-showcase-card {
     grid-column: auto;
+    border-radius: 24px;
   }
 
   .recent-feature-card {
@@ -2007,11 +2059,36 @@ body.nav-menu-open {
 
 @media (max-width: 480px) {
   nav {
-    padding: 0 16px;
+    top: 8px;
+    height: 58px;
+    padding: 0 12px;
+  }
+
+  .nav-pill {
+    max-width: calc(100vw - 72px);
+    min-height: 42px;
+    padding: 7px 17px;
   }
 
   .nav-brand {
-    font-size: 1.34rem;
+    font-size: 1.24rem;
+  }
+
+  .nav-actions {
+    right: 12px;
+  }
+
+  .hamburger {
+    width: 42px;
+    height: 42px;
+    background: rgba(10, 10, 15, 0.52);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  }
+
+  .nav-links {
+    top: 66px;
   }
 
   .hero-icon {
@@ -2029,7 +2106,76 @@ body.nav-menu-open {
   .film-page-shell,
   .books-page-shell,
   .articles-page-shell {
-    width: min(100% - 28px, 640px);
+    width: min(100% - 24px, 640px);
+  }
+
+  .home-hero {
+    padding-top: 82px;
+  }
+
+  .home-hero .hero-title-main {
+    font-size: clamp(2.45rem, 16vw, 3.6rem);
+  }
+
+  .home-hero .hero-sub-main {
+    font-size: 0.88rem;
+    line-height: 1.62;
+  }
+
+  .hero-total-num {
+    font-size: 2.35rem;
+  }
+
+  .home-hero .hero-cats {
+    margin-top: 14px;
+  }
+
+  .home-hero .hero-cat {
+    padding: 0 4px;
+  }
+
+  .home-hero .hero-cat-num {
+    font-size: 1.02rem;
+  }
+
+  .home-hero .hero-cat-label {
+    font-size: 0.68rem;
+  }
+
+  .home-hero .music-card {
+    height: 74px;
+    margin-top: 18px;
+    padding: 8px 10px 8px 8px;
+    border-radius: 28px;
+  }
+
+  .music-cover {
+    width: 54px;
+    height: 54px;
+  }
+
+  .music-name {
+    max-width: 94px;
+    font-size: 0.84rem;
+  }
+
+  .music-artist {
+    font-size: 0.72rem;
+  }
+
+  .music-controls {
+    gap: 4px;
+    margin-right: 2px;
+  }
+
+  .music-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .music-play {
+    width: 36px;
+    height: 36px;
   }
 
   .film-columns,
@@ -2043,17 +2189,17 @@ body.nav-menu-open {
   }
 
   .category-showcase {
-    margin-top: 7vh;
+    margin-top: 48px;
     margin-bottom: 44px;
   }
 
   .category-showcase-grid {
     grid-template-columns: 1fr;
-    gap: 14px;
+    gap: 12px;
   }
 
   .category-showcase-card {
-    min-height: 150px;
+    min-height: 132px;
     padding: 16px;
     border-radius: 20px;
   }
@@ -2103,7 +2249,9 @@ body.nav-menu-open {
   }
 
   .recent-feature-cover {
+    width: 70px;
     height: 88px;
+    margin-left: 0;
     border-radius: 16px;
   }
 
@@ -2125,15 +2273,25 @@ body.nav-menu-open {
 
   .recent-filmstrip {
     width: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
     gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
     margin-left: 0;
-    padding: 0;
+    padding: 0 2px 10px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .recent-filmstrip::-webkit-scrollbar {
+    display: none;
   }
 
   .recent-strip-item {
+    flex: 0 0 132px;
     padding: 9px;
     border-radius: 14px;
+    scroll-snap-align: start;
   }
 
   .image-gallery {
