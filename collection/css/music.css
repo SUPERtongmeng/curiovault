@@ -840,6 +840,137 @@ body.page-music {
   text-decoration: none;
 }
 
+
+.queue-lyric-line.is-interlude {
+  min-height: 1.05em;
+}
+
+.queue-lyric-interlude {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34em;
+  min-width: 1.74em;
+  margin-left: 0.12em;
+  line-height: 0;
+  vertical-align: middle;
+  transform-origin: left center;
+}
+
+.queue-lyric-line.is-current.is-interlude .queue-lyric-interlude {
+  animation: lyricInterludeGroupLift 0.48s cubic-bezier(0.2, 0.85, 0.2, 1) both;
+}
+
+.queue-lyric-interlude span {
+  display: grid;
+  place-items: center;
+  width: 0.36em;
+  height: 0.36em;
+  line-height: 0;
+  border-radius: 999px;
+  opacity: 0;
+  transform: scale(0.42);
+  transform-box: border-box;
+  transform-origin: 50% 50%;
+}
+
+.queue-lyric-interlude span::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: var(--dot-opacity, 0.18);
+  transform: scale(1);
+  transition: opacity 0.24s ease;
+  transform-box: border-box;
+  transform-origin: 50% 50%;
+}
+
+.queue-lyric-line.is-current.is-dot-ready .queue-lyric-interlude span {
+  animation: lyricInterludeDotIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.queue-lyric-line.is-current.is-dot-ready .queue-lyric-interlude span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.queue-lyric-line.is-current.is-dot-ready .queue-lyric-interlude span:nth-child(2) {
+  animation-delay: 0.07s;
+}
+
+.queue-lyric-line.is-current.is-dot-ready .queue-lyric-interlude span:nth-child(3) {
+  animation-delay: 0.14s;
+}
+
+.queue-lyric-line.is-current.is-dot-ready .queue-lyric-interlude span::before {
+  animation: lyricInterludePulse 3.2s ease-in-out 0.42s infinite;
+}
+
+.queue-lyric-line.is-current .queue-lyric-interlude span:nth-child(1)::before {
+  --dot-opacity: var(--interlude-dot-1-opacity, 0.18);
+}
+
+.queue-lyric-line.is-current .queue-lyric-interlude span:nth-child(2)::before {
+  --dot-opacity: var(--interlude-dot-2-opacity, 0.18);
+}
+
+.queue-lyric-line.is-current .queue-lyric-interlude span:nth-child(3)::before {
+  --dot-opacity: var(--interlude-dot-3-opacity, 0.18);
+}
+
+.queue-lyric-line.is-current.is-interlude-ending .queue-lyric-interlude span::before {
+  animation: lyricInterludeExit 0.48s linear 0s forwards;
+}
+
+@keyframes lyricInterludeGroupLift {
+  0% {
+    transform: translate3d(0, 0.12em, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes lyricInterludeDotIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.42);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes lyricInterludeExit {
+  0% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  68% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+  86% {
+    opacity: 1;
+    transform: scale(0.16);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.04);
+  }
+}
+
+@keyframes lyricInterludePulse {
+  0%, 78%, 100% {
+    transform: scale(1);
+  }
+  38% {
+    transform: scale(1.16);
+  }
+}
+
 .queue-lyric-translation {
   display: block;
   margin-top: 10px;

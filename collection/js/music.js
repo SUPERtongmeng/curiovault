@@ -23,12 +23,12 @@
     var isTranslationVisible = false;
     var preloadedCovers = new Map();
     var lyricsCache = new Map();
+    var pendingLyricsRequests = new Map();
     var hasScheduledCoverWarmup = false;
     var hoverCard = getMusicHoverCard();
 
     audio.addEventListener('ended', function () {
-      isPlaying = false;
-      updatePlaybackUi();
+      playNextAfterEnded();
     });
 
     audio.addEventListener('pause', function () {
@@ -50,7 +50,7 @@
         '<div class="music-player-cover">' + coverImg(item, { loading: 'eager' }) + '</div>',
         '<div class="music-player-meta">',
         '<h1>' + esc(item.title || '未命名音乐') + '</h1>',
-        '<p class="music-player-artist"><span>' + esc(item.artist || item.description || '未填写艺术家') + '</span>' + iconTranslationButton(isLyricsView, isTranslationVisible) + '<button class="music-lyrics-toggle" type="button" data-music-action="lyrics" aria-label="歌词" aria-pressed="' + (isLyricsView ? 'true' : 'false') + '">' + iconLyrics() + '</button></p>',
+        '<p class="music-player-artist"><span>' + esc(item.artist || item.description || '未填写艺术家') + '</span>' + iconTranslationButton(false, false) + '<button class="music-lyrics-toggle" type="button" data-music-action="lyrics" aria-label="歌词" aria-pressed="' + (isLyricsView ? 'true' : 'false') + '">' + iconLyrics() + '</button></p>',
         '</div>',
         '<div class="music-player-controls" aria-label="音乐控制">',
         '<button class="music-panel-btn" type="button" data-music-action="prev" aria-label="上一首">' + iconPrev() + '</button>',
@@ -185,10 +185,30 @@
       return '<div class="music-hover-stars" aria-label="推荐 ' + escAttr(rating) + ' / 5">' + stars + '</div>';
     }
 
+    function playNextAfterEnded() {
+      var nextIndex = findNextPlayableIndex(selectedIndex + 1);
+      if (nextIndex === -1) {
+        isPlaying = false;
+        updatePlaybackUi();
+        return;
+      }
+      isPlaying = true;
+      setSelected(nextIndex);
+    }
+
+    function findNextPlayableIndex(startIndex) {
+      for (var index = startIndex; index < items.length; index += 1) {
+        if (getAudioSrc(items[index])) return index;
+      }
+      return -1;
+    }
+
     function setSelected(index) {
       var nextIndex = Math.max(0, Math.min(items.length - 1, index));
       var animateInfo = feature.querySelector('.music-player-content') !== null && nextIndex !== selectedIndex;
+      if (animateInfo) spawnTranslationButtonGhost();
       selectedIndex = nextIndex;
+      isTranslationVisible = false;
       renderSelectedMusic(items[selectedIndex], animateInfo);
       updateMusicPalette(items[selectedIndex]);
       applyDistances(selectedIndex);
@@ -199,6 +219,36 @@
       scheduleCoverWarmup();
       if (isLyricsView) loadLyricsForSelected();
       updatePlaybackUi();
+    }
+
+    function spawnTranslationButtonGhost() {
+      var button = feature.querySelector('[data-music-action="translation"]');
+      if (!button || !button.classList.contains('is-visible')) return;
+      var rect = button.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      var ghost = button.cloneNode(true);
+      ghost.classList.remove('is-visible');
+      ghost.setAttribute('aria-hidden', 'true');
+      ghost.tabIndex = -1;
+      ghost.style.position = 'fixed';
+      ghost.style.left = rect.left + 'px';
+      ghost.style.top = rect.top + 'px';
+      ghost.style.width = rect.width + 'px';
+      ghost.style.height = rect.height + 'px';
+      ghost.style.margin = '0';
+      ghost.style.zIndex = '9999';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.opacity = '0.72';
+      ghost.style.transform = 'translate3d(0, 0, 0) scale(1)';
+      ghost.style.transition = 'opacity 0.2s ease, transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      document.body.appendChild(ghost);
+      window.requestAnimationFrame(function () {
+        ghost.style.opacity = '0';
+        ghost.style.transform = 'translate3d(0, -2px, 0) scale(0.72)';
+      });
+      window.setTimeout(function () {
+        if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      }, 260);
     }
 
     queue.innerHTML = [
@@ -437,6 +487,7 @@
 
     function toggleLyricsView() {
       isLyricsView = !isLyricsView;
+      isTranslationVisible = false;
       lastLyricIndex = -1;
       hideMusicHoverCard(hoverCard);
       queue.classList.toggle('is-lyrics-view', isLyricsView);
@@ -462,16 +513,29 @@
       if (!button) return;
       var canShow = isLyricsView && hasSelectedLyricTranslation();
       if (!canShow) isTranslationVisible = false;
-      button.classList.toggle('is-visible', canShow);
       button.setAttribute('aria-hidden', canShow ? 'false' : 'true');
       button.tabIndex = canShow ? 0 : -1;
       button.setAttribute('aria-pressed', isTranslationVisible ? 'true' : 'false');
+      if (canShow) {
+        if (!button.classList.contains('is-visible')) {
+          window.requestAnimationFrame(function () {
+            if (button.isConnected && isLyricsView && hasSelectedLyricTranslation()) {
+              button.classList.add('is-visible');
+            }
+          });
+        }
+      } else {
+        button.classList.remove('is-visible');
+      }
       queue.classList.toggle('is-translation-hidden', !isTranslationVisible);
-      if (isLyricsView) settleQueueLyricPositions(queue.querySelector('.music-lyrics-view'));
+      if (isLyricsView) settleQueueLyricPositions(queue.querySelector('.music-lyrics-view'), { animate: false });
     }
 
     function hasSelectedLyricTranslation() {
-      var result = getSelectedLyricsResult();
+      return lyricsResultHasTranslation(getSelectedLyricsResult());
+    }
+
+    function lyricsResultHasTranslation(result) {
       return Boolean(result && Array.isArray(result.lines) && result.lines.some(function (line) {
         return line && String(line.translation || '').trim();
       }));
@@ -492,12 +556,45 @@
         lastLyricIndex = -1;
         renderQueueLyrics(panel, cached, audio.currentTime || 0, getPlaybackDuration());
         updateTranslationToggle();
+        prefetchAdjacentLyrics();
         return;
       }
       panel.innerHTML = renderQueueLyricsStatus('\u6b63\u5728\u52a0\u8f7d\u6b4c\u8bcd');
       lastLyricIndex = -1;
       updateTranslationToggle();
-      fetch(getLyricsEndpoint(), {
+      prefetchAdjacentLyrics();
+      fetchLyricsForItem(item).then(function (result) {
+        if (!isLyricsView || getLyricsKey(items[selectedIndex]) !== key) return;
+        lastLyricIndex = -1;
+        renderQueueLyrics(panel, result, audio.currentTime || 0, getPlaybackDuration());
+        updateTranslationToggle();
+      });
+    }
+
+    function prefetchAdjacentLyrics() {
+      if (!isLyricsView) return;
+      prefetchLyricsAtIndex(selectedIndex - 1);
+      prefetchLyricsAtIndex(selectedIndex + 1);
+    }
+
+    function prefetchLyricsAtIndex(index) {
+      if (index < 0 || index >= items.length) return;
+      var item = items[index];
+      var key = getLyricsKey(item);
+      if (!key || lyricsCache.has(key) || pendingLyricsRequests.has(key)) return;
+      fetchLyricsForItem(item).then(function () {
+        updateTranslationToggle();
+      });
+    }
+
+    function fetchLyricsForItem(item) {
+      var key = getLyricsKey(item);
+      if (!key) return Promise.resolve({ lines: [], message: '\u6682\u65e0\u6b4c\u8bcd' });
+      var cached = lyricsCache.get(key);
+      if (cached) return Promise.resolve(cached);
+      var pending = pendingLyricsRequests.get(key);
+      if (pending) return pending;
+      pending = fetch(getLyricsEndpoint(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: item.title || '', artist: item.artist || '', link: item.link || '', songId: item.neteaseSongId || item.songId || '' })
@@ -509,12 +606,16 @@
       }).then(function (data) {
         var result = normalizeLyricsResult(data);
         lyricsCache.set(key, result);
-        if (isLyricsView) { lastLyricIndex = -1; renderQueueLyrics(panel, result, audio.currentTime || 0, getPlaybackDuration()); updateTranslationToggle(); }
+        return result;
       }).catch(function (error) {
         var fallback = { lines: [], message: getLyricsErrorMessage(error) };
         lyricsCache.set(key, fallback);
-        if (isLyricsView) { lastLyricIndex = -1; renderQueueLyrics(panel, fallback, audio.currentTime || 0, getPlaybackDuration()); updateTranslationToggle(); }
+        return fallback;
+      }).finally(function () {
+        pendingLyricsRequests.delete(key);
       });
+      pendingLyricsRequests.set(key, pending);
+      return pending;
     }
 
     function getLyricsErrorMessage(error) {
@@ -528,6 +629,14 @@
     var lastLyricIndex = -1;
     var LYRIC_LINE_GUTTER = 34;
     var CURRENT_LYRIC_SCALE = 1.1;
+    var LYRIC_SYNC_LEAD = 0.20;
+    var LYRIC_INTERLUDE_REAL_GAP = 7;
+    var LYRIC_INTERLUDE_INTRO_GAP = 4;
+    var LYRIC_INTERLUDE_MIN_HOLD = 2.6;
+    var LYRIC_INTERLUDE_MAX_HOLD = 5;
+    var LYRIC_INTERLUDE_APPEAR_TIME = 0.4;
+    var LYRIC_INTERLUDE_ENDING_TIME = 0.95;
+    var LYRIC_INTERLUDE_PULSE_START = 0.42;
 
     function updateQueueLyrics(elapsed, duration) {
       if (!isLyricsView) return;
@@ -535,13 +644,51 @@
       var key = getLyricsKey(items[selectedIndex]);
       var result = key ? lyricsCache.get(key) : null;
       if (!panel || !result) return;
-      var lines = result.lines || [];
+      var lines = getDisplayLyricLines(result.lines || []);
       if (!lines.length) return;
       var activeIndex = getActiveLyricIndex(lines, elapsed);
       if (activeIndex !== lastLyricIndex || !panel.querySelector('.queue-lyrics-lines:not(.queue-lyrics-status)')) {
         lastLyricIndex = activeIndex;
         renderQueueLyrics(panel, result, elapsed, duration);
       }
+      updateInterludeProgress(panel, lines[activeIndex], elapsed);
+    }
+
+    function updateInterludeProgress(panel, activeLine, elapsed) {
+      var element = panel && panel.querySelector('.queue-lyric-line.is-current.is-interlude');
+      if (!element || !activeLine || activeLine.type !== 'interlude') return;
+      var age = Math.max(0, elapsed - activeLine.time);
+      var hasNextTime = Number.isFinite(activeLine.nextTime);
+      var remaining = hasNextTime ? activeLine.nextTime - elapsed : Infinity;
+      var interludeDuration = hasNextTime ? Math.max(0, activeLine.nextTime - activeLine.time) : 0;
+      var startDuration = LYRIC_INTERLUDE_APPEAR_TIME + LYRIC_INTERLUDE_PULSE_START;
+      var breathDuration = Math.max(0, interludeDuration - startDuration - LYRIC_INTERLUDE_ENDING_TIME);
+      var breathAge = Math.max(0, age - startDuration);
+      var dotWindow = breathDuration > 0 ? breathDuration / 3 : 0;
+      var isEnding = remaining <= LYRIC_INTERLUDE_ENDING_TIME;
+      element.classList.toggle('is-dot-ready', age >= LYRIC_INTERLUDE_APPEAR_TIME);
+      setInterludeDotOpacity(element, 1, isEnding ? 1 : getInterludeBreathProgress(breathAge, dotWindow, 0));
+      setInterludeDotOpacity(element, 2, isEnding ? 1 : getInterludeBreathProgress(breathAge, dotWindow, 1));
+      setInterludeDotOpacity(element, 3, isEnding ? 1 : getInterludeBreathProgress(breathAge, dotWindow, 2));
+      element.classList.toggle('is-interlude-ending', isEnding);
+    }
+    function setInterludeDotOpacity(element, dotNumber, progress) {
+      var opacity = 0.18 + clamp01(progress) * 0.82;
+      element.style.setProperty('--interlude-dot-' + dotNumber + '-opacity', opacity.toFixed(3));
+    }
+
+    function getInterludeBreathProgress(breathAge, dotWindow, dotIndex) {
+      if (dotWindow <= 0) return 1;
+      return smoothstep(clamp01((breathAge - dotWindow * dotIndex) / dotWindow));
+    }
+
+    function smoothstep(value) {
+      return value * value * (3 - 2 * value);
+    }
+
+    function clamp01(value) {
+      if (!Number.isFinite(value)) return 0;
+      return Math.max(0, Math.min(1, value));
     }
 
     function normalizeLyricsResult(data) {
@@ -565,25 +712,26 @@
     }
 
     function renderQueueLyrics(panel, result, elapsed, duration) {
-      var lines = result.lines || [];
+      var lines = getDisplayLyricLines(result.lines || []);
       if (!lines.length) {
         panel.innerHTML = renderQueueLyricsStatus(result.message || '\u6682\u65e0\u6b4c\u8bcd');
         return;
       }
       var activeIndex = getActiveLyricIndex(lines, elapsed);
       var previousLineStates = getCurrentLyricLineStates(panel);
-      var windowLines = getLyricWindow(lines, activeIndex);
+      var lyricWindow = getLyricWindow(lines, activeIndex);
+      var windowLines = lyricWindow.lines;
       panel.innerHTML = [
-        '<div class="queue-lyrics-lines" style="--active-line:' + activeIndex + '">',
+        '<div class="queue-lyrics-lines" style="--active-line:' + lyricWindow.activeViewIndex + '">',
         windowLines.map(function (line, index) {
-          var distance = line.sourceIndex - activeIndex;
+          var distance = line.viewIndex - lyricWindow.activeViewIndex;
           var distanceAbs = Math.abs(distance);
           var previousState = previousLineStates.get(line.sourceIndex);
           var previousPhase = previousState && previousState.phase;
           var nextPhase = distance === 0 ? 'current' : distance < 0 ? 'before' : 'after';
           var initialPhase = nextPhase === 'current' && previousPhase && previousPhase !== 'current' ? previousPhase : nextPhase;
-          var className = 'queue-lyric-line is-' + initialPhase + (initialPhase !== nextPhase ? ' is-pending-current' : '');
-          var primary = renderLyricPrimary(line.text);
+          var className = 'queue-lyric-line is-' + initialPhase + (line.type === 'interlude' ? ' is-interlude' : '') + (initialPhase !== nextPhase ? ' is-pending-current' : '');
+          var primary = renderLyricPrimary(line);
           var previousY = previousState && previousState.y;
           var initialY = Number.isFinite(previousY) ? previousY : distance * 158;
           var lineStyle = [
@@ -626,18 +774,23 @@
       return states;
     }
 
-    function settleQueueLyricPositions(panel) {
+    function settleQueueLyricPositions(panel, options) {
       if (!panel || !window.requestAnimationFrame) return;
+      var shouldAnimate = !options || options.animate !== false;
       window.requestAnimationFrame(function () {
         var positionedLines = getMeasuredLyricLinePositions(panel);
         panel.offsetHeight;
         var gsap = getGsap();
-        if (gsap && !prefersReducedMotion()) {
+        if (shouldAnimate && gsap && !prefersReducedMotion()) {
           animateQueueLyricPositions(gsap, positionedLines);
           return;
         }
         positionedLines.forEach(function (line) {
+          if (gsap) gsap.killTweensOf(line.element);
+          line.element.classList.remove('is-gsap-animated');
           line.element.style.setProperty('--line-y', line.y + 'px');
+          line.element.style.opacity = '';
+          line.element.style.transform = '';
           promotePendingCurrentLyric(line.element);
         });
       });
@@ -753,8 +906,47 @@
       return line.classList.contains('is-current') || line.classList.contains('is-pending-current') ? height * CURRENT_LYRIC_SCALE : height;
     }
 
-    function renderLyricPrimary(text) {
-      return '<span class="queue-lyric-primary">' + esc(text) + '</span>';
+    function renderLyricPrimary(line) {
+      if (line && line.type === 'interlude') {
+        return '<span class="queue-lyric-primary queue-lyric-interlude" aria-hidden="true"><span></span><span></span><span></span></span>';
+      }
+      return '<span class="queue-lyric-primary">' + esc(line && line.text) + '</span>';
+    }
+
+    function getDisplayLyricLines(lines) {
+      var displayLines = [];
+      var lyricLines = lines.filter(function (line) { return line && line.text; });
+      var firstLine = lyricLines[0];
+      if (firstLine && Number.isFinite(firstLine.time) && firstLine.time >= LYRIC_INTERLUDE_INTRO_GAP) {
+        displayLines.push({
+          type: 'interlude',
+          text: '',
+          time: 0,
+          nextTime: firstLine.time
+        });
+      }
+      lyricLines.forEach(function (line, index) {
+        displayLines.push(line);
+        var nextLine = lyricLines[index + 1];
+        if (!nextLine || !Number.isFinite(nextLine.time) || !Number.isFinite(line.time)) return;
+        var interludeTime = getLyricInterludeStartTime(line, nextLine);
+        if (!Number.isFinite(interludeTime)) return;
+        displayLines.push({
+          type: 'interlude',
+          text: '',
+          time: interludeTime,
+          nextTime: nextLine.time
+        });
+      });
+      return displayLines;
+    }
+
+    function getLyricInterludeStartTime(line, nextLine) {
+      var textLength = String(line.text || '').replace(/\s+/g, '').length;
+      var hold = Math.min(LYRIC_INTERLUDE_MAX_HOLD, LYRIC_INTERLUDE_MIN_HOLD + textLength * 0.08);
+      var startTime = line.time + hold;
+      if (nextLine.time - startTime < LYRIC_INTERLUDE_REAL_GAP) return NaN;
+      return startTime;
     }
 
     function renderQueueLyricsStatus(message) {
@@ -764,19 +956,29 @@
     function getActiveLyricIndex(lines, elapsed) {
       var index = 0;
       for (var i = 0; i < lines.length; i += 1) {
-        if (lines[i].time > elapsed + 0.12) break;
+        if (lines[i].time > elapsed + LYRIC_SYNC_LEAD) break;
         index = i;
       }
       return index;
     }
 
     function getLyricWindow(lines, activeIndex) {
-      var start = Math.max(0, activeIndex - 4);
-      var end = Math.min(lines.length, start + 9);
-      start = Math.max(0, end - 9);
-      return lines.slice(start, end).map(function (line, offset) {
-        return Object.assign({ sourceIndex: start + offset }, line);
+      var visibleLines = lines.map(function (line, index) {
+        return Object.assign({ sourceIndex: index }, line);
+      }).filter(function (line) {
+        return line.type !== 'interlude' || line.sourceIndex === activeIndex;
       });
+      var activeViewIndex = visibleLines.findIndex(function (line) { return line.sourceIndex === activeIndex; });
+      if (activeViewIndex < 0) activeViewIndex = 0;
+      var start = Math.max(0, activeViewIndex - 4);
+      var end = Math.min(visibleLines.length, start + 9);
+      start = Math.max(0, end - 9);
+      return {
+        activeViewIndex: activeViewIndex - start,
+        lines: visibleLines.slice(start, end).map(function (line, offset) {
+          return Object.assign({ viewIndex: offset }, line);
+        })
+      };
     }
 
     function getLyricsKey(item) {
