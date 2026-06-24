@@ -266,6 +266,7 @@
       updateTranslationToggle();
       loadSelectedAudio(isPlaying);
       preloadNearbyCovers(selectedIndex);
+      preloadSelectedLyrics();
       scheduleCoverWarmup();
       if (isLyricsView) loadLyricsForSelected();
       updatePlaybackUi();
@@ -604,8 +605,12 @@
       } else {
         button.classList.remove('is-visible');
       }
-      queue.classList.toggle('is-translation-hidden', !isTranslationVisible);
-      if (isLyricsView) settleQueueLyricPositions(queue.querySelector('.music-lyrics-view'), { animate: false });
+      var shouldHideTranslation = !isTranslationVisible;
+      var wasTranslationHidden = queue.classList.contains('is-translation-hidden');
+      queue.classList.toggle('is-translation-hidden', shouldHideTranslation);
+      if (isLyricsView && wasTranslationHidden !== shouldHideTranslation) {
+        settleQueueLyricPositions(queue.querySelector('.music-lyrics-view'), { animate: false });
+      }
     }
 
     function hasSelectedLyricTranslation() {
@@ -664,6 +669,16 @@
       });
     }
 
+    function preloadSelectedLyrics() {
+      var item = items[selectedIndex];
+      var key = getLyricsKey(item);
+      if (!key || lyricsCache.has(key) || pendingLyricsRequests.has(key)) return;
+      fetchLyricsForItem(item).then(function () {
+        if (getLyricsKey(items[selectedIndex]) !== key) return;
+        updateTranslationToggle();
+      });
+    }
+
     function fetchLyricsForItem(item) {
       var key = getLyricsKey(item);
       if (!key) return Promise.resolve({ lines: [], message: '\u6682\u65e0\u6b4c\u8bcd' });
@@ -671,7 +686,13 @@
       if (cached) return Promise.resolve(cached);
       var pending = pendingLyricsRequests.get(key);
       if (pending) return pending;
-      pending = fetch(getLyricsEndpoint(), {
+      var endpoint = getLyricsEndpoint();
+      if (!endpoint) {
+        var unavailable = { lines: [], message: '\u6b4c\u8bcd\u63a5\u53e3\u672a\u8fde\u4e0a' };
+        lyricsCache.set(key, unavailable);
+        return Promise.resolve(unavailable);
+      }
+      pending = fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: item.title || '', artist: item.artist || '', link: item.link || '', songId: item.neteaseSongId || item.songId || '' })
@@ -704,6 +725,8 @@
     }
 
     var lastLyricIndex = -1;
+    var lyricLayoutFrameId = 0;
+    var lyricLayoutRequestId = 0;
     var LYRIC_LINE_GUTTER = 34;
     var CURRENT_LYRIC_SCALE = 1.1;
     var LYRIC_SYNC_LEAD = 0.20;
@@ -798,6 +821,7 @@
       var previousLineStates = getCurrentLyricLineStates(panel);
       var lyricWindow = getLyricWindow(lines, activeIndex);
       var windowLines = lyricWindow.lines;
+      var shouldUseGsap = Boolean(getGsap() && !prefersReducedMotion());
       panel.innerHTML = [
         '<div class="queue-lyrics-lines" style="--active-line:' + lyricWindow.activeViewIndex + '">',
         windowLines.map(function (line, index) {
@@ -807,10 +831,14 @@
           var previousPhase = previousState && previousState.phase;
           var nextPhase = distance === 0 ? 'current' : distance < 0 ? 'before' : 'after';
           var initialPhase = nextPhase === 'current' && previousPhase && previousPhase !== 'current' ? previousPhase : nextPhase;
-          var className = 'queue-lyric-line is-' + initialPhase + (line.type === 'interlude' ? ' is-interlude' : '') + (initialPhase !== nextPhase ? ' is-pending-current' : '');
+          var className = 'queue-lyric-line is-' + initialPhase + (shouldUseGsap ? ' is-gsap-animated' : '') + (line.type === 'interlude' ? ' is-interlude' : '') + (initialPhase !== nextPhase ? ' is-pending-current' : '');
           var primary = renderLyricPrimary(line);
           var previousY = previousState && previousState.y;
           var initialY = Number.isFinite(previousY) ? previousY : distance * 158;
+          var targetScale = nextPhase === 'current' ? CURRENT_LYRIC_SCALE : (1 - Math.min(distanceAbs, 4) * 0.035);
+          var targetOpacity = nextPhase === 'current' ? 1 : Math.max(0.22, 0.74 - distanceAbs * 0.13);
+          var initialScale = previousState && Number.isFinite(previousState.scale) ? previousState.scale : (initialPhase === 'current' ? CURRENT_LYRIC_SCALE : targetScale);
+          var initialOpacity = previousState && Number.isFinite(previousState.opacity) ? previousState.opacity : (initialPhase === 'current' ? 1 : targetOpacity);
           var lineStyle = [
             '--line-index:' + index,
             '--line-delay:' + ((8 - index) * 34) + 'ms',
@@ -818,10 +846,10 @@
             '--line-offset:' + distance,
             '--line-y:' + initialY + 'px',
             '--line-shift:0px',
-            '--line-scale:' + (1 - Math.min(distanceAbs, 4) * 0.035).toFixed(3),
-            '--line-opacity:' + Math.max(0.22, 0.74 - distanceAbs * 0.13).toFixed(2)
+            '--line-scale:' + initialScale.toFixed(3),
+            '--line-opacity:' + initialOpacity.toFixed(2)
           ].join(';');
-          return '<p class="' + className + '" data-source-index="' + line.sourceIndex + '" data-line-offset="' + distance + '" data-prev-y="' + initialY + '" data-prev-scale="' + (previousState && Number.isFinite(previousState.scale) ? previousState.scale : (initialPhase === 'current' ? CURRENT_LYRIC_SCALE : (1 - Math.min(distanceAbs, 4) * 0.035).toFixed(3))) + '" data-prev-opacity="' + (previousState && Number.isFinite(previousState.opacity) ? previousState.opacity : (initialPhase === 'current' ? 1 : Math.max(0.22, 0.74 - distanceAbs * 0.13).toFixed(2))) + '" style="' + lineStyle + '">' + primary + (line.translation ? '<span class="queue-lyric-translation">' + esc(line.translation) + '</span>' : '') + '</p>';
+          return '<p class="' + className + '" data-source-index="' + line.sourceIndex + '" data-line-offset="' + distance + '" data-prev-y="' + initialY + '" data-prev-scale="' + initialScale.toFixed(3) + '" data-prev-opacity="' + initialOpacity.toFixed(2) + '" data-target-scale="' + targetScale.toFixed(3) + '" data-target-opacity="' + targetOpacity.toFixed(2) + '" style="' + lineStyle + '">' + primary + (line.translation ? '<span class="queue-lyric-translation">' + esc(line.translation) + '</span>' : '') + '</p>';
         }).join(''),
         '</div>'
       ].join('');
@@ -854,7 +882,12 @@
     function settleQueueLyricPositions(panel, options) {
       if (!panel || !window.requestAnimationFrame) return;
       var shouldAnimate = !options || options.animate !== false;
-      window.requestAnimationFrame(function () {
+      lyricLayoutRequestId += 1;
+      var requestId = lyricLayoutRequestId;
+      if (lyricLayoutFrameId) window.cancelAnimationFrame(lyricLayoutFrameId);
+      lyricLayoutFrameId = window.requestAnimationFrame(function () {
+        if (requestId !== lyricLayoutRequestId) return;
+        lyricLayoutFrameId = 0;
         var positionedLines = getMeasuredLyricLinePositions(panel);
         panel.offsetHeight;
         var gsap = getGsap();
@@ -890,18 +923,11 @@
         });
         gsap.to(element, {
           y: line.y,
-          duration: state.isCurrent ? 0.46 : cascadeDelay ? 0.68 : 0.54,
+          scale: state.toScale,
+          duration: state.isCurrent ? 0.50 : cascadeDelay ? 0.68 : 0.54,
           delay: cascadeDelay,
           ease: state.isCurrent ? 'power2.out' : cascadeDelay ? 'power3.out' : 'power4.out',
-          overwrite: 'auto',
-          force3D: true
-        });
-        gsap.to(element, {
-          scale: state.toScale,
-          duration: state.isCurrent ? 0.50 : 0.46,
-          delay: cascadeDelay * 0.72,
-          ease: state.isCurrent ? 'power2.out' : 'power3.out',
-          overwrite: 'auto',
+          overwrite: true,
           force3D: true
         });
         gsap.to(element, {
@@ -942,11 +968,11 @@
     }
 
     function getLyricTargetScale(element) {
-      return readNumber(element.style.getPropertyValue('--line-scale'), 1);
+      return readNumber(element.dataset.targetScale, readNumber(element.style.getPropertyValue('--line-scale'), 1));
     }
 
     function getLyricTargetOpacity(element) {
-      return readNumber(element.style.getPropertyValue('--line-opacity'), 0.38);
+      return readNumber(element.dataset.targetOpacity, readNumber(element.style.getPropertyValue('--line-opacity'), 0.38));
     }
 
     function getGsap() {
