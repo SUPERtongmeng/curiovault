@@ -811,7 +811,7 @@ body.page-music {
   background: transparent;
   transform: translate3d(-22px, var(--line-y, 0px), 0) scale(0.96);
   transform-origin: left top;
-  transition: transform 0.78s cubic-bezier(0.18, 1.18, 0.24, 1), opacity 0.42s ease, color 0.28s ease;
+  transition: opacity 0.46s ease, color 0.44s ease;
   transition-delay: 0ms;
   will-change: transform, opacity;
 }
@@ -822,7 +822,7 @@ body.page-music {
 }
 
 .queue-lyric-line.is-gsap-animated {
-  transition: color 0.28s ease;
+  transition: color 0.44s ease;
 }
 
 .music-queue.is-lyrics-view .queue-lyric-line.is-before {
@@ -843,7 +843,7 @@ body.page-music {
 
 .music-queue.is-lyrics-view .queue-lyric-line.is-current {
   opacity: 1;
-  transform: translate3d(0, var(--line-y, 0px), 0) scale(1.1);
+  --line-shift: 0px;
 }
 
 .queue-lyric-primary {
