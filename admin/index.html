@@ -35,65 +35,51 @@
 
   <main class="main-content">
     <section class="dashboard-head" aria-label="管理概览">
-      <div>
-        <p class="eyebrow">Library Console</p>
-        <h1>收藏作品</h1>
-      </div>
+      <h1>收藏作品</h1>
       <p class="dashboard-note" id="dashboardNote">UI 原型模式，数据暂未连接</p>
     </section>
 
     <section class="stats-strip" aria-label="收藏统计">
       <div class="stat-total">
-        <span class="stat-label">总收藏</span>
         <strong class="stat-value" id="statTotal">0</strong>
+        <span class="stat-label"><i class="fa-solid fa-layer-group" aria-hidden="true"></i>总收藏</span>
       </div>
       <div class="stat-breakdown" aria-label="分类数量">
-        <span class="stat-pill"><span>音乐</span><strong id="statMusic">0</strong></span>
-        <span class="stat-pill"><span>电影</span><strong id="statMovie">0</strong></span>
-        <span class="stat-pill"><span>电视剧</span><strong id="statTv">0</strong></span>
-        <span class="stat-pill"><span>书籍</span><strong id="statBooks">0</strong></span>
-        <span class="stat-pill"><span>图片</span><strong id="statImages">0</strong></span>
-        <span class="stat-pill"><span>文章</span><strong id="statArticles">0</strong></span>
+        <span class="stat-pill"><strong id="statMusic">0</strong><span>音乐</span></span>
+        <span class="stat-pill"><strong id="statMovie">0</strong><span>电影</span></span>
+        <span class="stat-pill"><strong id="statTv">0</strong><span>电视剧</span></span>
+        <span class="stat-pill"><strong id="statBooks">0</strong><span>书籍</span></span>
+        <span class="stat-pill"><strong id="statImages">0</strong><span>图片</span></span>
+        <span class="stat-pill"><strong id="statArticles">0</strong><span>文章</span></span>
       </div>
       <div class="stat-latest">
-        <span class="stat-label">最近添加</span>
         <strong id="statLatest">-</strong>
+        <span class="stat-label">最近添加</span>
       </div>
     </section>
 
     <section class="health-panel" aria-label="连接健康">
-      <div class="health-head">
-        <div>
-          <p class="health-kicker">System Health</p>
-          <h2>连接健康</h2>
-        </div>
+      <div class="health-row">
+        <h2 class="health-title">连接健康</h2>
+        <article class="health-item" id="healthFirestore" data-health-state="checking">
+          <span class="health-name">Firestore</span>
+          <span class="health-chip" id="healthFirestoreStatus"><i></i>检查中</span>
+          <p id="healthFirestoreMsg">正在检查数据库连接...</p>
+        </article>
+        <article class="health-item" id="healthData" data-health-state="checking">
+          <span class="health-name">数据结构</span>
+          <span class="health-chip" id="healthDataStatus"><i></i>检查中</span>
+          <p id="healthDataMsg">正在检查 items 字段和分类...</p>
+        </article>
+        <article class="health-item" id="healthFrontend" data-health-state="checking">
+          <span class="health-name">前台读取</span>
+          <span class="health-chip" id="healthFrontendStatus"><i></i>检查中</span>
+          <p id="healthFrontendMsg">正在检查前台页面资源...</p>
+        </article>
         <button class="health-refresh" id="btnHealthRefresh" type="button">
           <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
           <span>重新检查</span>
         </button>
-      </div>
-      <div class="health-grid">
-        <article class="health-item" id="healthFirestore" data-health-state="checking">
-          <div class="health-item-top">
-            <span class="health-name">Firestore</span>
-            <span class="health-chip" id="healthFirestoreStatus"><i></i>检查中</span>
-          </div>
-          <p id="healthFirestoreMsg">正在检查数据库连接...</p>
-        </article>
-        <article class="health-item" id="healthData" data-health-state="checking">
-          <div class="health-item-top">
-            <span class="health-name">数据结构</span>
-            <span class="health-chip" id="healthDataStatus"><i></i>检查中</span>
-          </div>
-          <p id="healthDataMsg">正在检查 items 字段和分类...</p>
-        </article>
-        <article class="health-item" id="healthFrontend" data-health-state="checking">
-          <div class="health-item-top">
-            <span class="health-name">前台读取</span>
-            <span class="health-chip" id="healthFrontendStatus"><i></i>检查中</span>
-          </div>
-          <p id="healthFrontendMsg">正在检查前台页面资源...</p>
-        </article>
       </div>
     </section>
 
@@ -157,25 +143,28 @@
   <div class="modal-overlay" id="modalOverlay" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
-        <div>
-          <p class="modal-kicker">Collection Item</p>
-          <h2 id="modalTitle">添加作品</h2>
-        </div>
+        <h2 id="modalTitle">添加作品</h2>
         <button class="modal-close" id="modalClose" type="button" aria-label="关闭弹窗">
           <i class="fa-solid fa-xmark" aria-hidden="true"></i>
         </button>
       </div>
       <form id="modalForm">
         <input type="hidden" id="editId" />
-        <section class="form-section autofill-hero" aria-label="智能识别">
-          <div class="form-section-head">
-            <div>
-              <p class="form-section-kicker">Smart Fill</p>
-              <h3>先识别作品，再确认信息</h3>
-            </div>
+
+        <section class="form-section" aria-label="基本信息">
+          <h3 class="form-section-title">基本信息</h3>
+          <div class="form-grid">
             <div class="form-group form-cat">
-              <label for="mCat">类别</label>
-              <select id="mCat">
+              <span class="form-label">类别 <span class="required">*</span></span>
+              <div class="cat-options" role="radiogroup" aria-label="类别">
+                <button type="button" class="cat-option active" data-value="music" aria-pressed="true">音乐</button>
+                <button type="button" class="cat-option" data-value="movie" aria-pressed="false">电影</button>
+                <button type="button" class="cat-option" data-value="tv" aria-pressed="false">电视剧</button>
+                <button type="button" class="cat-option" data-value="books" aria-pressed="false">书籍</button>
+                <button type="button" class="cat-option" data-value="images" aria-pressed="false">图片</button>
+                <button type="button" class="cat-option" data-value="articles" aria-pressed="false">文章</button>
+              </div>
+              <select id="mCat" hidden>
                 <option value="music">音乐</option>
                 <option value="movie">电影</option>
                 <option value="tv">电视剧</option>
@@ -184,69 +173,71 @@
                 <option value="articles">文章</option>
               </select>
             </div>
-          </div>
-          <div class="form-group form-title">
-            <label for="mTitle">标题 <span class="required">*</span></label>
-            <div class="autofill-title-row">
-              <input type="text" id="mTitle" required autocomplete="off" />
-              <button class="btn-autofill" id="btnAutofill" type="button">
-                <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-                <span>一键填充</span>
-              </button>
+            <div class="form-group form-title">
+              <label for="mTitle">标题 <span class="required">*</span></label>
+              <div class="autofill-title-row">
+                <input type="text" id="mTitle" required autocomplete="off" />
+                <button class="btn-autofill" id="btnAutofill" type="button">
+                  <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                  <span>一键填充</span>
+                </button>
+              </div>
+              <p class="autofill-status" id="autofillStatus" aria-live="polite">输入标题或识别线索后可自动识别作者、描述、标签和年份。</p>
             </div>
-            <p class="autofill-status" id="autofillStatus" aria-live="polite">输入标题或识别线索后可自动识别作者、描述、标签和年份。</p>
-          </div>
-          <div class="form-group form-clue">
-            <label for="mClue">识别线索</label>
-            <input type="text" id="mClue" placeholder="如：韩国特工伪装成家庭 / 画着巨大海浪的日本版画" autocomplete="off" />
+            <div class="form-group form-clue">
+              <label for="mClue">识别线索</label>
+              <input type="text" id="mClue" placeholder="如：韩国特工伪装成家庭 / 画着巨大海浪的日本版画" autocomplete="off" />
+            </div>
           </div>
           <div class="autofill-panel" id="autofillPanel" hidden></div>
         </section>
-        <section class="form-section manual-fields" aria-label="作品信息">
-          <div class="form-section-head">
-            <div>
-              <p class="form-section-kicker">Details</p>
-              <h3>确认后保存</h3>
+
+        <section class="form-section" aria-label="详细信息">
+          <h3 class="form-section-title">详细信息</h3>
+          <div class="form-grid">
+            <div class="form-group form-artist">
+              <label for="mArtist">艺术家 / 作者 / 导演</label>
+              <input type="text" id="mArtist" autocomplete="off" />
+            </div>
+            <div class="form-group form-cover">
+              <label for="mCover">封面图片 URL</label>
+              <input type="url" id="mCover" placeholder="https://..." />
+            </div>
+            <div class="form-group form-desc">
+              <label for="mDesc">描述</label>
+              <input type="text" id="mDesc" autocomplete="off" />
+            </div>
+            <div class="form-group form-tags">
+              <label for="mTags">标签</label>
+              <input type="text" id="mTags" placeholder="科幻, 经典, 想重看" autocomplete="off" />
+            </div>
+            <div class="form-group form-year">
+              <label for="mYear">年份</label>
+              <input type="text" id="mYear" maxlength="24" placeholder="如 1889 / 19世纪 / 约1830" />
+            </div>
+            <div class="form-group form-rating">
+              <label for="mRating">推荐程度</label>
+              <input type="number" id="mRating" min="1" max="5" step="0.5" value="4" inputmode="decimal" />
+            </div>
+            <div class="form-group form-duration" id="durationGroup" hidden>
+              <label for="mDuration">音乐时长</label>
+              <input type="text" id="mDuration" maxlength="24" placeholder="如 3:45 / 04:12" autocomplete="off" />
+            </div>
+            <div class="form-group form-song-id" id="songIdGroup" hidden>
+              <label for="mSongId">网易云歌曲 ID</label>
+              <input type="text" id="mSongId" maxlength="32" inputmode="numeric" placeholder="如 19572271" autocomplete="off" />
+            </div>
+            <div class="form-group form-link">
+              <label for="mLink">链接</label>
+              <input type="url" id="mLink" placeholder="https://..." />
             </div>
           </div>
-          <div class="form-group form-artist">
-            <label for="mArtist">艺术家 / 作者 / 导演</label>
-            <input type="text" id="mArtist" autocomplete="off" />
-          </div>
-          <div class="form-group form-cover">
-            <label for="mCover">封面图片 URL</label>
-            <input type="url" id="mCover" placeholder="https://..." />
-          </div>
-          <div class="form-group form-desc">
-            <label for="mDesc">描述</label>
-            <input type="text" id="mDesc" autocomplete="off" />
-          </div>
-          <div class="form-group form-tags">
-            <label for="mTags">标签</label>
-            <input type="text" id="mTags" placeholder="科幻, 经典, 想重看" autocomplete="off" />
-          </div>
-          <div class="form-group">
-            <label for="mYear">年份</label>
-            <input type="text" id="mYear" maxlength="24" placeholder="如 1889 / 19世纪 / 约1830" />
-          </div>
-          <div class="form-group form-duration" id="durationGroup" hidden>
-            <label for="mDuration">音乐时长</label>
-            <input type="text" id="mDuration" maxlength="24" placeholder="如 3:45 / 04:12" autocomplete="off" />
-          </div>
-          <div class="form-group form-song-id" id="songIdGroup" hidden>
-            <label for="mSongId">网易云歌曲 ID</label>
-            <input type="text" id="mSongId" maxlength="32" inputmode="numeric" placeholder="如 19572271" autocomplete="off" />
-          </div>
-          <div class="form-group">
-            <label for="mRating">推荐程度</label>
-            <input type="number" id="mRating" min="1" max="5" step="0.5" value="4" inputmode="decimal" />
-          </div>
-          <div class="form-group form-link">
-            <label for="mLink">链接</label>
-            <input type="url" id="mLink" placeholder="https://..." />
-          </div>
         </section>
-        <button type="submit" class="btn-submit">保存</button>
+
+        <div class="modal-footer">
+          <button class="btn-cancel" id="modalCancel" type="button">取消</button>
+          <button type="submit" class="btn-submit">保存</button>
+        </div>
       </form>
     </div>
   </div>
@@ -256,6 +247,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <script src="../collection/js/firebase-config.js"></script>
+  <script src="../collection/js/shared.js"></script>
   <script src="js/admin.js"></script>
 </body>
 </html>

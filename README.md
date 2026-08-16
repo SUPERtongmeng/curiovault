@@ -18,6 +18,8 @@ collection/  前台收藏网站
 api/         Vercel Serverless Function，用于小米 MiMo 智能填充代理
 ```
 
+前端共享工具集中在 `collection/js/shared.js`（全局 `window.CurioVault`），网易云辅助代码集中在 `api/_lib/netease.js`。首页只读一次 `items` 集合，再分发给统计、展柜、最近收藏和封面背景。
+
 ## 数据字段
 
 Firestore 集合名固定为 `items`，主要字段：

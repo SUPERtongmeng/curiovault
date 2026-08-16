@@ -1,20 +1,11 @@
-﻿// Shared Firestore data layer and page-specific renderers.
+// Shared Firestore data layer and page-specific renderers.
 (function () {
-  var CATEGORY_LABELS = {
-    music: '音乐',
-    movie: '电影',
-    tv: '电视剧',
-    books: '书籍',
-    images: '图片',
-    articles: '文章'
-  };
-
   window.CollectionData = {
     initFirebase: initFirebase,
     loadItems: loadItems,
-    getTime: getTime,
-    esc: esc,
-    escAttr: escAttr,
+    getTime: function (value) { return window.CurioVault.getTime(value); },
+    esc: function (value) { return window.CurioVault.esc(value); },
+    escAttr: function (value) { return window.CurioVault.escAttr(value); },
     getCategoryLabel: getCategoryLabel
   };
 
@@ -53,7 +44,7 @@
       return groups.reduce(function (list, group) {
         return list.concat(group);
       }, []).sort(function (a, b) {
-        return getTime(b.createdAt) - getTime(a.createdAt);
+        return window.CurioVault.getTime(b.createdAt) - window.CurioVault.getTime(a.createdAt);
       });
     });
   }
@@ -119,9 +110,9 @@
       return [
         '<article class="book-card">',
         '<div class="book-cover">' + coverImg(item) + '</div>',
-        '<div><h2>' + esc(item.title || '未命名书籍') + '</h2>',
-        '<p>' + esc(item.artist || '未填写作者') + '</p>',
-        '<span>' + esc(item.year || '') + ' ' + stars(item.rating) + '</span></div>',
+        '<div><h2>' + window.CurioVault.esc(item.title || '未命名书籍') + '</h2>',
+        '<p>' + window.CurioVault.esc(item.artist || '未填写作者') + '</p>',
+        '<span>' + window.CurioVault.esc(item.year || '') + ' ' + window.CurioVault.stars(item.rating) + '</span></div>',
         '</article>'
       ].join('');
     }).join('') : emptyBlock('还没有书籍收藏');
@@ -134,7 +125,7 @@
       return [
         '<figure class="image-tile">',
         coverImg(item),
-        '<figcaption><strong>' + esc(item.title || '未命名图片') + '</strong><span>' + esc(item.artist || item.year || '') + '</span></figcaption>',
+        '<figcaption><strong>' + window.CurioVault.esc(item.title || '未命名图片') + '</strong><span>' + window.CurioVault.esc(item.artist || item.year || '') + '</span></figcaption>',
         '</figure>'
       ].join('');
     }).join('') : emptyBlock('还没有图片收藏');
@@ -147,8 +138,8 @@
       return [
         '<article class="article-row">',
         '<span class="article-date">' + formatDate(item.createdAt) + '</span>',
-        '<div><h2>' + esc(item.title || '未命名文章') + '</h2>',
-        '<p>' + esc(item.description || item.artist || '未填写摘要') + '</p>',
+        '<div><h2>' + window.CurioVault.esc(item.title || '未命名文章') + '</h2>',
+        '<p>' + window.CurioVault.esc(item.description || item.artist || '未填写摘要') + '</p>',
         renderTags(item.tags),
         '</div>',
         '</article>'
@@ -160,9 +151,9 @@
     return [
       '<article class="film-card">',
       '<div class="film-poster">' + coverImg(item) + '</div>',
-      '<div><span>' + esc(getCategoryLabel(item.category)) + '</span><h2>' + esc(item.title || '未命名影视') + '</h2>',
-      '<p>' + esc(item.artist || item.year || '') + '</p>',
-      '<strong>' + stars(item.rating) + '</strong></div>',
+      '<div><span>' + window.CurioVault.esc(getCategoryLabel(item.category)) + '</span><h2>' + window.CurioVault.esc(item.title || '未命名影视') + '</h2>',
+      '<p>' + window.CurioVault.esc(item.artist || item.year || '') + '</p>',
+      '<strong>' + window.CurioVault.stars(item.rating) + '</strong></div>',
       '</article>'
     ].join('');
   }
@@ -170,16 +161,16 @@
   function coverImg(item) {
     var title = item.title || '?';
     if (item.coverUrl) {
-      return '<img src="' + escAttr(item.coverUrl) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.textContent=\'' + escAttr(title.charAt(0) || '?') + '\'" />';
+      return '<img src="' + window.CurioVault.escAttr(item.coverUrl) + '" alt="" loading="lazy" decoding="async" onerror="this.parentElement.textContent=\'' + window.CurioVault.escAttr(title.charAt(0) || '?') + '\'" />';
     }
-    return '<span class="cover-letter">' + esc(title.charAt(0) || '?') + '</span>';
+    return '<span class="cover-letter">' + window.CurioVault.esc(title.charAt(0) || '?') + '</span>';
   }
 
   function renderTags(tags) {
     var normalized = Array.isArray(tags) ? tags.filter(Boolean).slice(0, 4) : [];
     if (!normalized.length) return '';
     return '<div class="article-tags">' + normalized.map(function (tag) {
-      return '<span>' + esc(tag) + '</span>';
+      return '<span>' + window.CurioVault.esc(tag) + '</span>';
     }).join('') + '</div>';
   }
 
@@ -190,55 +181,24 @@
 
   function setError(page, message) {
     var target = document.querySelector('[data-page-loading="' + page + '"]');
-    if (target) target.innerHTML = '<p class="collection-empty collection-error">' + esc(message) + '</p>';
+    if (target) target.innerHTML = '<p class="collection-empty collection-error">' + window.CurioVault.esc(message) + '</p>';
   }
 
   function emptyBlock(message) {
-    return '<p class="collection-empty">' + esc(message) + '</p>';
+    return '<p class="collection-empty">' + window.CurioVault.esc(message) + '</p>';
   }
 
   function getCategoryLabel(category) {
-    return CATEGORY_LABELS[category] || category || '';
-  }
-
-  function stars(value) {
-    var rating = Math.max(1, Math.min(5, Math.round((parseFloat(value) || 4) * 2) / 2));
-    var out = '';
-    for (var i = 1; i <= 5; i += 1) {
-      if (rating >= i) {
-        out += '★';
-      } else if (rating >= i - 0.5) {
-        out += '⯨';
-      } else {
-        out += '☆';
-      }
-    }
-    return out;
+    return window.CurioVault.CATEGORY_LABELS[category] || category || '';
   }
 
   function pad(value) {
     return value < 10 ? '0' + value : String(value);
   }
 
-  function getTime(value) {
-    if (!value) return 0;
-    if (value.toDate) return value.toDate().getTime();
-    return new Date(value).getTime() || 0;
-  }
-
   function formatDate(value) {
-    var time = getTime(value);
+    var time = window.CurioVault.getTime(value);
     if (!time) return '-';
     return new Date(time).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
-  }
-
-  function esc(value) {
-    var div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
-  }
-
-  function escAttr(value) {
-    return esc(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 })();

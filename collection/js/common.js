@@ -1,13 +1,5 @@
 // Shared front-end shell: navigation, mobile menu, and home background.
 (function () {
-  var CATEGORY_LABELS = {
-    music: '音乐',
-    movie: '电影',
-    tv: '电视剧',
-    books: '书籍',
-    images: '图片',
-    articles: '文章'
-  };
   var NAV_ITEMS = [
     { href: 'index.html', label: '首页', icon: 'fa-house' },
     { href: 'music.html', label: '音乐', icon: 'fa-music' },
@@ -22,11 +14,8 @@
   bindNavbar();
   bindPageTransitions();
   bindCards();
-  initCoverBg();
-  initHomeStats();
-  initCategoryShowcase();
-  initRecentCollection();
   initMusicPlayer();
+  initHomeData();
 
   function applyDefaultTheme() {
     document.documentElement.setAttribute('data-theme', 'dark');
@@ -145,167 +134,120 @@
     });
   }
 
-  function initSharedFirestore() {
-    if (typeof firebase === 'undefined' || typeof FIREBASE_CONFIG === 'undefined') {
-      return null;
+  function initHomeData() {
+    if (!document.body.classList.contains('page-home')) return;
+
+    var feature = document.getElementById('recentFeature');
+    var activity = document.getElementById('recentActivity');
+    var filmstrip = document.getElementById('recentFilmstrip');
+    if (feature && activity && filmstrip) {
+      feature.innerHTML = '<p class="collection-empty">正在读取最近收藏...</p>';
+      renderRecentActivityLoading(activity);
+      filmstrip.innerHTML = '';
     }
-    try {
-      if (!firebase.apps || firebase.apps.length === 0) {
-        firebase.initializeApp(FIREBASE_CONFIG);
-      }
-      return firebase.firestore();
-    } catch (error) {
-      if (!/already exists|already been created/i.test(error.message || '')) {
-        console.warn('Firebase init failed:', error);
-        return null;
-      }
-      return firebase.firestore();
-    }
+
+    window.CurioVault.loadAllItems().then(function (items) {
+      renderHomeStats(items);
+      renderCategoryShowcase(items);
+      renderRecentCollection(items);
+      renderCoverBg(items);
+    });
   }
 
-  function initHomeStats() {
+  function renderHomeStats(items) {
     var stats = document.getElementById('homeStats');
     if (!stats) return;
 
-    var db = initSharedFirestore();
-    if (!db) return;
+    var counts = {
+      total: 0,
+      music: 0,
+      film: 0,
+      books: 0,
+      images: 0,
+      articles: 0
+    };
 
-    db.collection('items').get().then(function (snapshot) {
-      var counts = {
-        total: 0,
-        music: 0,
-        film: 0,
-        books: 0,
-        images: 0,
-        articles: 0
-      };
+    (items || []).forEach(function (item) {
+      var category = item.category;
+      counts.total += 1;
+      if (category === 'movie' || category === 'tv') counts.film += 1;
+      else if (Object.prototype.hasOwnProperty.call(counts, category)) counts[category] += 1;
+    });
 
-      snapshot.forEach(function (doc) {
-        var category = (doc.data() || {}).category;
-        counts.total += 1;
-        if (category === 'movie' || category === 'tv') counts.film += 1;
-        else if (Object.prototype.hasOwnProperty.call(counts, category)) counts[category] += 1;
-      });
-
-      Object.keys(counts).forEach(function (key) {
-        var target = stats.querySelector('[data-home-count="' + key + '"]');
-        if (target) target.textContent = counts[key];
-      });
-    }).catch(function (error) {
-      console.warn('Home stats Firestore read failed:', error);
+    Object.keys(counts).forEach(function (key) {
+      var target = stats.querySelector('[data-home-count="' + key + '"]');
+      if (target) target.textContent = counts[key];
     });
   }
 
-  function initCategoryShowcase() {
+  function renderCategoryShowcase(items) {
     var showcase = document.getElementById('categoryShowcase');
     if (!showcase) return;
 
-    var db = initSharedFirestore();
-    if (!db) return;
+    var groups = {
+      music: { count: 0, covers: [] },
+      film: { count: 0, covers: [] },
+      books: { count: 0, covers: [] },
+      images: { count: 0, covers: [] },
+      articles: { count: 0, covers: [] }
+    };
 
-    db.collection('items').get().then(function (snapshot) {
-      var groups = {
-        music: { count: 0, covers: [] },
-        film: { count: 0, covers: [] },
-        books: { count: 0, covers: [] },
-        images: { count: 0, covers: [] },
-        articles: { count: 0, covers: [] }
-      };
+    (items || []).forEach(function (item) {
+      var key = item.category === 'movie' || item.category === 'tv' ? 'film' : item.category;
+      var coverUrl = typeof item.coverUrl === 'string' ? item.coverUrl.trim() : '';
+      if (!Object.prototype.hasOwnProperty.call(groups, key)) return;
 
-      snapshot.forEach(function (doc) {
-        var data = doc.data() || {};
-        var key = data.category === 'movie' || data.category === 'tv' ? 'film' : data.category;
-        var coverUrl = typeof data.coverUrl === 'string' ? data.coverUrl.trim() : '';
-        if (!Object.prototype.hasOwnProperty.call(groups, key)) return;
+      groups[key].count += 1;
+      if (coverUrl && groups[key].covers.indexOf(coverUrl) === -1) {
+        groups[key].covers.push(coverUrl);
+      }
+    });
 
-        groups[key].count += 1;
-        if (coverUrl && groups[key].covers.indexOf(coverUrl) === -1) {
-          groups[key].covers.push(coverUrl);
-        }
+    Object.keys(groups).forEach(function (key) {
+      var group = groups[key];
+      var countTarget = showcase.querySelector('[data-showcase-count="' + key + '"]');
+      var card = showcase.querySelector('[data-showcase-card="' + key + '"]');
+      var stack = card ? card.querySelector('.showcase-cover-stack') : null;
+
+      if (countTarget) countTarget.textContent = group.count + ' 件收藏';
+      if (!stack) return;
+
+      stack.innerHTML = '';
+      pickShowcaseCovers(group.covers, key).forEach(function (src, index) {
+        var img = document.createElement('img');
+        var placement = getShowcaseCoverPlacement(key, index);
+        img.src = src;
+        img.alt = '';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.style.setProperty('--cover-left', placement.left + 'px');
+        img.style.setProperty('--cover-top', placement.top + 'px');
+        img.style.setProperty('--cover-rotate', placement.rotate + 'deg');
+        img.style.setProperty('--cover-hover-x', placement.hoverX + 'px');
+        img.style.setProperty('--cover-hover-y', placement.hoverY + 'px');
+        img.style.setProperty('--cover-hover-rotate', placement.hoverRotate + 'deg');
+        img.onerror = function () {
+          this.remove();
+        };
+        stack.appendChild(img);
       });
-
-      Object.keys(groups).forEach(function (key) {
-        var group = groups[key];
-        var countTarget = showcase.querySelector('[data-showcase-count="' + key + '"]');
-        var card = showcase.querySelector('[data-showcase-card="' + key + '"]');
-        var stack = card ? card.querySelector('.showcase-cover-stack') : null;
-
-        if (countTarget) countTarget.textContent = group.count + ' 件收藏';
-        if (!stack) return;
-
-        stack.innerHTML = '';
-        pickShowcaseCovers(group.covers, key).forEach(function (src, index) {
-          var img = document.createElement('img');
-          var placement = getShowcaseCoverPlacement(key, index);
-          img.src = src;
-          img.alt = '';
-          img.loading = 'lazy';
-          img.decoding = 'async';
-          img.style.setProperty('--cover-left', placement.left + 'px');
-          img.style.setProperty('--cover-top', placement.top + 'px');
-          img.style.setProperty('--cover-rotate', placement.rotate + 'deg');
-          img.style.setProperty('--cover-hover-x', placement.hoverX + 'px');
-          img.style.setProperty('--cover-hover-y', placement.hoverY + 'px');
-          img.style.setProperty('--cover-hover-rotate', placement.hoverRotate + 'deg');
-          img.onerror = function () {
-            this.remove();
-          };
-          stack.appendChild(img);
-        });
-      });
-    }).catch(function (error) {
-      console.warn('Category showcase Firestore read failed:', error);
     });
   }
 
-  function initRecentCollection() {
+  function renderRecentCollection(items) {
     var section = document.getElementById('recentCollection');
     var feature = document.getElementById('recentFeature');
     var activity = document.getElementById('recentActivity');
     var filmstrip = document.getElementById('recentFilmstrip');
     if (!section || !feature || !filmstrip) return;
 
-    feature.innerHTML = '<p class="collection-empty">正在读取最近收藏...</p>';
-    renderRecentActivityLoading(activity);
-    filmstrip.innerHTML = '';
-
-    loadRecentItemsFromRest()
-      .then(function (items) {
-        renderRecentItems(feature, filmstrip, activity, items);
-      })
-      .catch(function (restError) {
-        console.warn('Recent collection REST read failed:', restError);
-        loadRecentItemsFromSdk()
-          .then(function (items) {
-            renderRecentItems(feature, filmstrip, activity, items);
-          })
-          .catch(function (sdkError) {
-            console.warn('Recent collection Firestore read failed:', sdkError);
-            feature.innerHTML = '<p class="collection-empty">最近收藏加载失败：' + esc(getErrorMessage(restError || sdkError)) + '</p>';
-            renderRecentActivityError(activity);
-          });
-      });
-  }
-
-  function loadRecentItemsFromSdk() {
-    var db = initSharedFirestore();
-    if (!db) return Promise.reject(new Error('Firebase SDK 不可用'));
-
-    return db.collection('items')
-      .get()
-      .then(function (snapshot) {
-        return snapshot.docs.map(function (doc) {
-          var data = doc.data() || {};
-          data.id = doc.id;
-          return data;
-        });
-      });
+    renderRecentItems(feature, filmstrip, activity, items || []);
   }
 
   function renderRecentItems(feature, filmstrip, activity, sourceItems) {
     var allItems = (sourceItems || []).slice();
     var items = allItems.slice().sort(function (a, b) {
-      return getItemTime(b.createdAt) - getItemTime(a.createdAt);
+      return window.CurioVault.getTime(b.createdAt) - window.CurioVault.getTime(a.createdAt);
     }).slice(0, 8);
 
     renderRecentActivity(activity, allItems);
@@ -431,7 +373,7 @@
   }
 
   function getItemActivityDate(item) {
-    var time = getItemTime(item && (item.createdAt || item.updatedAt));
+    var time = window.CurioVault.getTime(item && (item.createdAt || item.updatedAt));
     if (!time) return null;
     return startOfLocalDay(new Date(time));
   }
@@ -476,64 +418,6 @@
       });
     });
     return labels;
-  }
-
-  function loadRecentItemsFromRest() {
-    var restUrl = getFirestoreRestUrl();
-    if (!restUrl) return Promise.reject(new Error('Firebase 配置未加载'));
-
-    return fetch(restUrl)
-      .then(function (response) {
-        return response.json().catch(function () {
-          return {};
-        }).then(function (data) {
-          if (!response.ok) {
-            throw new Error((data.error && data.error.message) || 'REST 读取失败');
-          }
-          return (data.documents || []).map(normalizeRestItem);
-        });
-      });
-  }
-
-  function getFirestoreRestUrl() {
-    if (typeof FIREBASE_CONFIG === 'undefined' || !FIREBASE_CONFIG.projectId || !FIREBASE_CONFIG.apiKey) {
-      return '';
-    }
-    return 'https://firestore.googleapis.com/v1/projects/'
-      + encodeURIComponent(FIREBASE_CONFIG.projectId)
-      + '/databases/(default)/documents/items?key='
-      + encodeURIComponent(FIREBASE_CONFIG.apiKey);
-  }
-
-  function normalizeRestItem(doc) {
-    var data = decodeRestFields(doc.fields || {});
-    data.id = getRestDocId(doc.name);
-    return data;
-  }
-
-  function decodeRestFields(fields) {
-    var output = {};
-    Object.keys(fields).forEach(function (key) {
-      output[key] = decodeRestValue(fields[key]);
-    });
-    return output;
-  }
-
-  function decodeRestValue(value) {
-    if (!value) return null;
-    if (Object.prototype.hasOwnProperty.call(value, 'stringValue')) return value.stringValue;
-    if (Object.prototype.hasOwnProperty.call(value, 'integerValue')) return Number(value.integerValue);
-    if (Object.prototype.hasOwnProperty.call(value, 'doubleValue')) return Number(value.doubleValue);
-    if (Object.prototype.hasOwnProperty.call(value, 'booleanValue')) return Boolean(value.booleanValue);
-    if (Object.prototype.hasOwnProperty.call(value, 'timestampValue')) return value.timestampValue;
-    if (value.arrayValue) return (value.arrayValue.values || []).map(decodeRestValue);
-    if (value.mapValue) return decodeRestFields(value.mapValue.fields || {});
-    return null;
-  }
-
-  function getRestDocId(name) {
-    var parts = String(name || '').split('/');
-    return parts[parts.length - 1] || '';
   }
 
   function renderRecentCover(item) {
@@ -589,17 +473,11 @@
 
   function getCategoryLabelForDisplay(category) {
     if (category === 'movie' || category === 'tv') return '影视';
-    return CATEGORY_LABELS[category] || '收藏';
-  }
-
-  function getItemTime(value) {
-    if (!value) return 0;
-    if (value.toDate) return value.toDate().getTime();
-    return new Date(value).getTime() || 0;
+    return window.CurioVault.CATEGORY_LABELS[category] || '收藏';
   }
 
   function formatRecentDate(value) {
-    var time = getItemTime(value);
+    var time = window.CurioVault.getTime(value);
     if (!time) return '';
     return new Date(time).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
   }
@@ -657,7 +535,7 @@
     return Math.floor((value - Math.floor(value)) * (max - min + 1)) + min;
   }
 
-  function initCoverBg() {
+  function renderCoverBg(items) {
     var container = document.getElementById('coverTilesBg');
     var sceneWrapper = document.getElementById('sceneWrapper');
     if (!container || !sceneWrapper) return;
@@ -686,79 +564,16 @@
       };
     }
 
-    function initFirestore() {
-      return initSharedFirestore();
-    }
-
-    function normalizeCoverUrls(snapshot) {
+    function extractCoverUrls(items) {
       var seen = {};
       var urls = [];
-      snapshot.forEach(function (doc) {
-        var data = doc.data() || {};
-        var url = getItemCoverSrc(data);
+      (items || []).forEach(function (item) {
+        var url = window.CurioVault.getCoverSrc(item);
         if (!url || seen[url]) return;
         seen[url] = true;
         urls.push(url);
       });
       return urls.slice(0, 60);
-    }
-
-    function getItemCoverSrc(item) {
-      if (!item) return '';
-      var direct = [
-        item.coverUrl,
-        item.cover,
-        item.coverImgUrl,
-        item.imageUrl,
-        item.image,
-        item.picUrl,
-        item.imgUrl,
-        item.artworkUrl,
-        item.thumbnail,
-        item.poster
-      ];
-      for (var i = 0; i < direct.length; i += 1) {
-        var url = normalizeImageSource(direct[i]);
-        if (url) return url;
-      }
-      var collections = [item.images, item.imageUrls, item.covers, item.pictures];
-      for (var j = 0; j < collections.length; j += 1) {
-        var found = getFirstImageSource(collections[j]);
-        if (found) return found;
-      }
-      if (item.album) {
-        return normalizeImageSource(item.album.coverUrl || item.album.cover || item.album.coverImgUrl || item.album.picUrl || item.album.imageUrl || item.album.image);
-      }
-      return '';
-    }
-
-    function getFirstImageSource(value) {
-      if (Array.isArray(value)) {
-        for (var i = 0; i < value.length; i += 1) {
-          var url = normalizeImageSource(value[i]);
-          if (url) return url;
-        }
-        return '';
-      }
-      return normalizeImageSource(value);
-    }
-
-    function normalizeImageSource(value) {
-      if (typeof value === 'string') return value.trim();
-      if (!value || typeof value !== 'object') return '';
-      return normalizeImageSource(value.url || value.src || value.href || value.coverUrl || value.cover || value.coverImgUrl || value.imageUrl || value.image || value.picUrl || value.imgUrl || value.downloadURL);
-    }
-    function loadFirestoreCovers() {
-      var db = initFirestore();
-      if (!db) return Promise.resolve([]);
-      return db.collection('items')
-        .limit(120)
-        .get()
-        .then(normalizeCoverUrls)
-        .catch(function (error) {
-          console.warn('Cover background Firestore read failed:', error);
-          return [];
-        });
     }
 
     function createPreloadQueue(picker, size, tileW) {
@@ -895,15 +710,13 @@
     sceneWrapper.style.width = '100%';
     sceneWrapper.style.height = '100%';
 
-    loadFirestoreCovers().then(function (remoteCovers) {
-      if (remoteCovers.length === 0) {
-        stopTiles();
-        container.innerHTML = '';
-        return;
-      }
-      covers = remoteCovers;
-      bootTiles();
-    });
+    covers = extractCoverUrls(items);
+    if (covers.length === 0) {
+      stopTiles();
+      container.innerHTML = '';
+      return;
+    }
+    bootTiles();
 
     var resizeTimer;
     window.addEventListener('resize', function () {
@@ -953,17 +766,14 @@
   }
 
   function esc(value) {
-    var div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
+    return window.CurioVault.esc(value);
   }
 
   function escAttr(value) {
-    return esc(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    return window.CurioVault.escAttr(value);
   }
 
   function getErrorMessage(error) {
-    if (!error) return '未知错误';
-    return error.message || String(error);
+    return window.CurioVault.getErrorMessage(error);
   }
 })();

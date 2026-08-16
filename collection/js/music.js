@@ -1343,49 +1343,7 @@
     return '<svg class="track-lyrics-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="lyrics-bubble" d="M5.7 4.8h12.6c1.15 0 2.1.95 2.1 2.1v7.5c0 1.15-.95 2.1-2.1 2.1h-6.8l-4.2 3.25c-.38.3-.94.02-.94-.46V16.5H5.7c-1.15 0-2.1-.95-2.1-2.1V6.9c0-1.15.95-2.1 2.1-2.1z" /><path class="lyrics-quote" d="M8.25 8.55h2.45c.33 0 .6.27.6.6v2.05c0 .33-.27.6-.6.6H8.25c-.33 0-.6-.27-.6-.6V9.15c0-.33.27-.6.6-.6zm5 0h2.45c.33 0 .6.27.6.6v2.05c0 .33-.27.6-.6.6h-2.45c-.33 0-.6-.27-.6-.6V9.15c0-.33.27-.6.6-.6z" /></svg>';
   }
   function getCoverSrc(item) {
-    if (!item) return '';
-    var direct = [
-      item.coverUrl,
-      item.cover,
-      item.coverImgUrl,
-      item.imageUrl,
-      item.image,
-      item.picUrl,
-      item.imgUrl,
-      item.artworkUrl,
-      item.thumbnail,
-      item.poster
-    ];
-    for (var i = 0; i < direct.length; i += 1) {
-      var url = normalizeImageSource(direct[i]);
-      if (url) return url;
-    }
-    var collections = [item.images, item.imageUrls, item.covers, item.pictures];
-    for (var j = 0; j < collections.length; j += 1) {
-      var found = getFirstImageSource(collections[j]);
-      if (found) return found;
-    }
-    if (item.album) {
-      return normalizeImageSource(item.album.coverUrl || item.album.cover || item.album.coverImgUrl || item.album.picUrl || item.album.imageUrl || item.album.image);
-    }
-    return '';
-  }
-
-  function getFirstImageSource(value) {
-    if (Array.isArray(value)) {
-      for (var i = 0; i < value.length; i += 1) {
-        var url = normalizeImageSource(value[i]);
-        if (url) return url;
-      }
-      return '';
-    }
-    return normalizeImageSource(value);
-  }
-
-  function normalizeImageSource(value) {
-    if (typeof value === 'string') return value.trim();
-    if (!value || typeof value !== 'object') return '';
-    return normalizeImageSource(value.url || value.src || value.href || value.coverUrl || value.cover || value.coverImgUrl || value.imageUrl || value.image || value.picUrl || value.imgUrl || value.downloadURL);
+    return window.CurioVault.getCoverSrc(item);
   }
 
   function coverImg(item, options) {
@@ -1403,18 +1361,10 @@
     return '<p class="collection-empty">' + esc(message) + '</p>';
   }
   function esc(value) {
-    if (window.CollectionData && typeof window.CollectionData.esc === 'function') {
-      return window.CollectionData.esc(value);
-    }
-    var div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
+    return window.CurioVault.esc(value);
   }
 
   function escAttr(value) {
-    if (window.CollectionData && typeof window.CollectionData.escAttr === 'function') {
-      return window.CollectionData.escAttr(value);
-    }
-    return esc(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    return window.CurioVault.escAttr(value);
   }
 })();

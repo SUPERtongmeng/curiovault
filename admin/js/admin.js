@@ -7,15 +7,8 @@ var editingId = null;
 var deletingId = null;
 var db = null;
 
-var CATEGORIES = ['music', 'movie', 'tv', 'books', 'images', 'articles'];
-var CAT_LABELS = {
-  music: '音乐',
-  movie: '电影',
-  tv: '电视剧',
-  books: '书籍',
-  images: '图片',
-  articles: '文章'
-};
+var CATEGORIES = window.CurioVault.CATEGORIES;
+var CAT_LABELS = window.CurioVault.CATEGORY_LABELS;
 
 var modal = document.getElementById('modalOverlay');
 var modalTitle = document.getElementById('modalTitle');
@@ -108,6 +101,24 @@ if (btnAutofill) {
 
 document.getElementById('mCat').addEventListener('change', syncMusicFields);
 
+// 类别横铺选择：按钮组与隐藏 select 同步
+var catOptions = document.querySelectorAll('.cat-option');
+function syncCatOptions() {
+  var value = document.getElementById('mCat').value;
+  catOptions.forEach(function (btn) {
+    var active = btn.dataset.value === value;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+catOptions.forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    document.getElementById('mCat').value = btn.dataset.value;
+    syncCatOptions();
+    syncMusicFields();
+  });
+});
+
 document.getElementById('btnAdd').addEventListener('click', function () {
   editingId = null;
   modalTitle.textContent = '添加作品';
@@ -115,6 +126,7 @@ document.getElementById('btnAdd').addEventListener('click', function () {
   submitBtn.disabled = false;
   modalForm.reset();
   document.getElementById('mCat').value = currentCat || 'music';
+  syncCatOptions();
   syncMusicFields();
   document.getElementById('mRating').value = '4';
   resetAutofillUi();
@@ -122,6 +134,7 @@ document.getElementById('btnAdd').addEventListener('click', function () {
 });
 
 document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('modalCancel').addEventListener('click', closeModal);
 
 modal.addEventListener('click', function (event) {
   if (event.target === modal) closeModal();
@@ -389,40 +402,19 @@ function normalizeRestDoc(doc) {
 }
 
 function decodeRestFields(fields) {
-  var output = {};
-  Object.keys(fields).forEach(function (key) {
-    output[key] = decodeRestValue(fields[key]);
-  });
-  return output;
+  return window.CurioVault.decodeRestFields(fields);
 }
 
 function decodeRestValue(value) {
-  if (!value) return null;
-  if (Object.prototype.hasOwnProperty.call(value, 'stringValue')) return value.stringValue;
-  if (Object.prototype.hasOwnProperty.call(value, 'integerValue')) return Number(value.integerValue);
-  if (Object.prototype.hasOwnProperty.call(value, 'doubleValue')) return Number(value.doubleValue);
-  if (Object.prototype.hasOwnProperty.call(value, 'booleanValue')) return Boolean(value.booleanValue);
-  if (Object.prototype.hasOwnProperty.call(value, 'timestampValue')) return value.timestampValue;
-  if (value.arrayValue) {
-    return (value.arrayValue.values || []).map(decodeRestValue);
-  }
-  if (value.mapValue) return decodeRestFields(value.mapValue.fields || {});
-  return null;
+  return window.CurioVault.decodeRestValue(value);
 }
 
 function getRestDocId(name) {
-  var parts = String(name || '').split('/');
-  return parts[parts.length - 1] || '';
+  return window.CurioVault.getRestDocId(name);
 }
 
 function getFirestoreRestUrl() {
-  if (typeof FIREBASE_CONFIG === 'undefined' || !FIREBASE_CONFIG.projectId || !FIREBASE_CONFIG.apiKey) {
-    return '';
-  }
-  return 'https://firestore.googleapis.com/v1/projects/'
-    + encodeURIComponent(FIREBASE_CONFIG.projectId)
-    + '/databases/(default)/documents/items?key='
-    + encodeURIComponent(FIREBASE_CONFIG.apiKey);
+  return window.CurioVault.getFirestoreRestUrl();
 }
 
 function getRestErrorMessage(data) {
@@ -510,8 +502,7 @@ function extractNetEaseSongId(link) {
 }
 
 function cleanString(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
+  return window.CurioVault.cleanString(value);
 }
 
 function openModal() {
@@ -542,6 +533,7 @@ function editItem(id) {
   editingId = id;
   modalTitle.textContent = '编辑作品';
   document.getElementById('mCat').value = CATEGORIES.indexOf(item.category) === -1 ? 'music' : item.category;
+  syncCatOptions();
   document.getElementById('mTitle').value = item.title || '';
   document.getElementById('mArtist').value = item.artist || '';
   var clueInput = document.getElementById('mClue');
@@ -957,20 +949,11 @@ function getSearchText(item) {
 }
 
 function parseTags(value) {
-  if (!value) return [];
-  return normalizeTags(String(value).split(/[,\uff0c]/));
+  return window.CurioVault.parseTags(value, 6);
 }
 
 function normalizeTags(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) {
-    return value
-      .map(function (tag) { return String(tag).trim(); })
-      .filter(Boolean)
-      .filter(function (tag, index, list) { return list.indexOf(tag) === index; })
-      .slice(0, 6);
-  }
-  return parseTags(value);
+  return window.CurioVault.normalizeTags(value, 6);
 }
 
 function getEmptyMessage() {
@@ -1182,8 +1165,7 @@ function setHealthState(type, state, label, message) {
 }
 
 function getErrorMessage(error) {
-  if (!error) return '未知错误';
-  return error.message || String(error);
+  return window.CurioVault.getErrorMessage(error);
 }
 
 function renderCover(url, fallback) {
@@ -1200,18 +1182,7 @@ function renderTags(tags) {
 }
 
 function buildStars(rating) {
-  var value = clampRating(rating);
-  var stars = '';
-  for (var i = 1; i <= 5; i += 1) {
-    if (value >= i) {
-      stars += '★';
-    } else if (value >= i - 0.5) {
-      stars += '⯨';
-    } else {
-      stars += '☆';
-    }
-  }
-  return esc(stars);
+  return window.CurioVault.stars(rating);
 }
 
 function clampRating(value) {
@@ -1234,21 +1205,15 @@ function formatDate(timestamp) {
 }
 
 function timestampToDate(timestamp) {
-  if (!timestamp) return null;
-  if (timestamp instanceof Date) return timestamp;
-  if (timestamp.toDate) return timestamp.toDate();
-  var parsed = new Date(timestamp);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  return window.CurioVault.toDate(timestamp);
 }
 
 function esc(value) {
-  var div = document.createElement('div');
-  div.textContent = value == null ? '' : String(value);
-  return div.innerHTML;
+  return window.CurioVault.esc(value);
 }
 
 function escAttr(value) {
-  return esc(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return window.CurioVault.escAttr(value);
 }
 
 function boot() {
