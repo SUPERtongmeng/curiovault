@@ -207,7 +207,7 @@
     var db = initFirestore();
     if (db) {
       return db.collection('items')
-        .get()
+        .get({ source: 'server' })
         .then(function (snapshot) {
           return snapshot.docs.map(function (doc) {
             var data = doc.data() || {};

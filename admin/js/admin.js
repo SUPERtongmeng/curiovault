@@ -40,6 +40,7 @@ var durationGroup = document.getElementById('durationGroup');
 var songIdGroup = document.getElementById('songIdGroup');
 var autofillCandidates = [];
 var autofillExcludedCandidates = [];
+var healthItemsPromise = null;
 
 document.querySelectorAll('.cat-tab').forEach(function (tab) {
   tab.addEventListener('click', function () {
@@ -252,7 +253,7 @@ function loadItems() {
   dashboardNote.textContent = '正在连接 Firestore...';
 
   return db.collection('items')
-    .get()
+    .get({ source: 'server' })
     .then(function (snapshot) {
       allItems = snapshot.docs.map(normalizeDoc).filter(function (item) {
         return CATEGORIES.indexOf(item.category) !== -1;
@@ -1019,6 +1020,7 @@ function runHealthCheck() {
   setHealthState('frontend', 'checking', '检查中', '正在检查前台页面资源...');
 
   if (btnHealthRefresh) btnHealthRefresh.disabled = true;
+  healthItemsPromise = null;
 
   Promise.allSettled([
     checkFirestoreHealth(),
@@ -1044,17 +1046,13 @@ function getHealthDb() {
 }
 
 function checkFirestoreHealth() {
-  var healthDb;
-  try {
-    healthDb = getHealthDb();
-  } catch (error) {
-    setHealthState('firestore', 'error', '异常', error.message);
-    return Promise.resolve();
-  }
-
-  return healthDb.collection('items').limit(1).get()
-    .then(function (snapshot) {
-      var message = snapshot.empty ? 'items 集合可访问，目前暂无数据。' : 'items 集合可访问。';
+  return getHealthItems()
+    .then(function (result) {
+      var message = result.items.length === 0 ? 'items 集合可访问，目前暂无数据。' : 'items 集合可访问。';
+      if (result.source === 'rest') {
+        setHealthState('firestore', 'warn', '降级可用', 'SDK 直连不可用，REST 兜底读取正常。');
+        return;
+      }
       setHealthState('firestore', 'ok', '正常', message);
     })
     .catch(function (error) {
@@ -1063,17 +1061,9 @@ function checkFirestoreHealth() {
 }
 
 function checkDataHealth() {
-  var healthDb;
-  try {
-    healthDb = getHealthDb();
-  } catch (error) {
-    setHealthState('data', 'error', '异常', error.message);
-    return Promise.resolve();
-  }
-
-  return healthDb.collection('items').limit(20).get()
-    .then(function (snapshot) {
-      if (snapshot.empty) {
+  return getHealthItems()
+    .then(function (result) {
+      if (result.items.length === 0) {
         setHealthState('data', 'warn', '需注意', 'items 集合为空，前台暂时没有可读取数据。');
         return;
       }
@@ -1081,8 +1071,7 @@ function checkDataHealth() {
       var invalidCategory = 0;
       var legacyCategory = 0;
       var missingRequired = 0;
-      snapshot.forEach(function (doc) {
-        var data = doc.data() || {};
+      result.items.forEach(function (data) {
         if (data.category === 'film') legacyCategory += 1;
         if (CATEGORIES.indexOf(data.category) === -1) invalidCategory += 1;
         if (!data.title || !data.createdAt) missingRequired += 1;
@@ -1093,10 +1082,54 @@ function checkDataHealth() {
         return;
       }
 
-      setHealthState('data', 'ok', '正常', '抽样 ' + snapshot.size + ' 条数据，字段和分类看起来正常。');
+      setHealthState('data', 'ok', '正常', '抽样 ' + result.items.length + ' 条数据，字段和分类看起来正常。');
     })
     .catch(function (error) {
       setHealthState('data', 'error', '异常', '检查数据结构失败：' + getErrorMessage(error));
+    });
+}
+
+function getHealthItems() {
+  if (healthItemsPromise) return healthItemsPromise;
+
+  var healthDb;
+  try {
+    healthDb = getHealthDb();
+  } catch (error) {
+    healthItemsPromise = loadHealthItemsFromRest(error);
+    return healthItemsPromise;
+  }
+
+  healthItemsPromise = healthDb.collection('items').limit(20).get({ source: 'server' })
+    .then(function (snapshot) {
+      return {
+        source: 'sdk',
+        items: snapshot.docs.map(function (doc) { return doc.data() || {}; })
+      };
+    })
+    .catch(loadHealthItemsFromRest);
+
+  return healthItemsPromise;
+}
+
+function loadHealthItemsFromRest(sdkError) {
+  var restUrl = getFirestoreRestUrl();
+  if (!restUrl) return Promise.reject(sdkError || new Error('Firebase 配置未加载'));
+
+  return fetch(restUrl, { cache: 'no-store' })
+    .then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (data) {
+        if (!response.ok) throw new Error(getRestErrorMessage(data) || 'REST 读取失败');
+        return {
+          source: 'rest',
+          items: (data.documents || []).slice(0, 20).map(function (doc) {
+            return decodeRestFields(doc.fields || {});
+          })
+        };
+      });
+    })
+    .catch(function (restError) {
+      throw new Error('SDK 与 REST 均无法读取：' + getErrorMessage(restError));
     });
 }
 
