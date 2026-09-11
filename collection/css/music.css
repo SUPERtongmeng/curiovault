@@ -141,7 +141,7 @@ body.page-music {
   aspect-ratio: 1;
   position: relative;
   overflow: hidden;
-  border-radius: 64px;
+  border-radius: 100px;
   background: rgba(255, 255, 255, 0.14);
   isolation: isolate;
   transform-origin: center;
@@ -167,7 +167,7 @@ body.page-music {
 }
 
 .music-player-cover img {
-  border-radius: 64px;
+  border-radius: 0;
   transform-origin: center;
 }
 
@@ -676,7 +676,7 @@ body.page-music {
   gap: 16px;
   padding: 16px 20px;
   border: 1px solid transparent;
-  border-radius: 34px;
+  border-radius: var(--radius-card, 24px);
   background: rgba(255, 255, 255, 0.04);
   cursor: pointer;
   --dist: 3;
@@ -719,7 +719,7 @@ body.page-music {
   width: 58px;
   height: 58px;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: var(--radius-media, 16px);
   background: rgba(237, 146, 15, 0.12);
 }
 
@@ -814,6 +814,16 @@ body.page-music {
   transition: opacity 0.46s ease, color 0.44s ease;
   transition-delay: 0ms;
   will-change: transform, opacity;
+}
+
+@supports (corner-shape: squircle) {
+  .music-player-cover,
+  .music-track,
+  .track-cover,
+  .music-hover-card,
+  .music-hover-cover {
+    corner-shape: squircle;
+  }
 }
 
 .music-queue.is-lyrics-view .queue-lyric-line {
@@ -1019,7 +1029,7 @@ body.page-music {
   gap: 12px 14px;
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.42);
-  border-radius: 42px;
+  border-radius: var(--radius-surface, 28px);
   background: rgba(255, 255, 255, 0.2);
   box-shadow: 0 26px 80px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.55);
   color: rgba(255, 255, 255, 0.96);
@@ -1089,7 +1099,7 @@ body.page-music {
   width: 92px;
   height: 92px;
   overflow: hidden;
-  border-radius: 34px;
+  border-radius: var(--radius-media, 16px);
   background: rgba(255, 255, 255, 0.24);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2);
 }
@@ -1259,11 +1269,7 @@ body.page-music {
   }
 
   .music-player-cover {
-    border-radius: 38px;
-  }
-
-  .music-player-cover img {
-    border-radius: 38px;
+    border-radius: 82px;
   }
 
   .music-player-meta {
@@ -1340,13 +1346,13 @@ body.page-music {
     width: 100%;
     margin-left: 0;
     padding: 12px 14px;
-    border-radius: 24px;
+    border-radius: 56px;
   }
 
   .track-cover {
     width: 52px;
     height: 52px;
-    border-radius: 18px;
+    border-radius: 35px;
   }
 
   .music-hover-card {
@@ -1412,9 +1418,8 @@ body.page-music {
     width: min(100%, 250px);
   }
 
-  .music-player-cover,
-  .music-player-cover img {
-    border-radius: 32px;
+  .music-player-cover {
+    border-radius: 72px;
   }
 
   .music-player-meta h1 {
@@ -1445,13 +1450,13 @@ body.page-music {
     grid-template-columns: 48px minmax(0, 1fr) max-content;
     gap: 10px;
     padding: 10px 12px;
-    border-radius: 22px;
+    border-radius: 51px;
   }
 
   .track-cover {
     width: 48px;
     height: 48px;
-    border-radius: 16px;
+    border-radius: 33px;
   }
 
   .track-duration {

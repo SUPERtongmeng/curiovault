@@ -14,6 +14,32 @@
   --text: #e0e0e0;
   --text-muted: #999;
   --navbar-bg: rgba(10, 10, 10, 0.75);
+  /* iOS-style fixed corner hierarchy. Keep pill controls opt-in. */
+  --radius-surface: 72px;
+  --radius-card: 64px;
+  --radius-media: 40px;
+}
+
+/* Continuous-corner cards in supporting browsers; border-radius remains the fallback. */
+@supports (corner-shape: squircle) {
+  .category-showcase-card,
+  .showcase-cover-stack img,
+  .recent-feature-card,
+  .recent-activity,
+  .recent-feature-cover,
+  .recent-strip-item,
+  .recent-strip-cover,
+  .film-card,
+  .film-poster,
+  .book-card,
+  .book-cover,
+  .image-tile,
+  .article-row,
+  .card,
+  .recommend-banner,
+  .recommend-banner .btn-recommend {
+    corner-shape: squircle;
+  }
 }
 
 html {
@@ -674,7 +700,7 @@ body.page-articles {
   overflow: hidden;
   color: #fff;
   text-decoration: none;
-  border-radius: 32px;
+  border-radius: var(--radius-surface);
   border: 1px solid rgba(255, 255, 255, 0.24);
   background: rgba(255, 255, 255, 0.12);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 24px 70px rgba(0, 0, 0, 0.32);
@@ -706,7 +732,7 @@ body.page-articles {
   width: 64px;
   height: 82px;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: var(--radius-media);
   border: 1px solid rgba(255, 255, 255, 0.28);
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.32);
   transition: transform 0.35s ease, opacity 0.35s ease;
@@ -861,7 +887,7 @@ body.page-articles {
   padding: 16px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 22px;
+  border-radius: var(--radius-surface);
   background: rgba(255, 255, 255, 0.095);
   color: #fff;
   text-decoration: none;
@@ -880,7 +906,7 @@ body.page-articles {
   padding: 14px 16px 12px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 22px;
+  border-radius: var(--radius-surface);
   background: rgba(255, 255, 255, 0.075);
   color: #fff;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
@@ -903,6 +929,7 @@ body.page-articles {
   gap: 14px;
   min-height: 20px;
   margin-bottom: 6px;
+  padding-inline: clamp(8px, 1.5vw, 18px);
 }
 
 .activity-head h3 {
@@ -1024,7 +1051,7 @@ body.page-articles {
   justify-content: flex-end;
   gap: 5px;
   margin-top: auto;
-  padding-top: 5px;
+  padding: 5px clamp(8px, 1.5vw, 18px) 0;
   color: rgba(255, 255, 255, 0.5);
   font-size: 0.68rem;
 }
@@ -1061,7 +1088,7 @@ body.page-articles {
   flex: 0 0 auto;
   margin-left: 10px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 18px;
+  border-radius: var(--radius-media);
 }
 
 .recent-feature-cover img,
@@ -1164,7 +1191,7 @@ body.page-articles {
   min-width: 0;
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: rgba(255, 255, 255, 0.075);
   color: #fff;
   text-decoration: none;
@@ -1227,7 +1254,7 @@ body.page-articles {
 .recent-strip-cover {
   width: 100%;
   aspect-ratio: 4 / 5;
-  border-radius: 12px;
+  border-radius: var(--radius-media);
 }
 
 .recent-cover-letter {
@@ -1342,14 +1369,14 @@ body.page-articles {
   gap: 14px;
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
+  border-radius: var(--radius-card);
   background: rgba(255, 255, 255, 0.04);
 }
 
 .film-poster {
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: var(--radius-media);
   background: rgba(237, 146, 15, 0.12);
 }
 
@@ -1403,14 +1430,14 @@ body.page-articles {
   gap: 12px;
   padding: 14px;
   border: 1px solid rgba(237, 146, 15, 0.16);
-  border-radius: 14px;
+  border-radius: var(--radius-card);
   background: rgba(255, 255, 255, 0.04);
 }
 
 .book-cover {
   aspect-ratio: 3 / 4;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: var(--radius-media);
   background: rgba(237, 146, 15, 0.12);
 }
 
@@ -1446,7 +1473,7 @@ body.page-articles {
   margin: 0 0 14px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
+  border-radius: var(--radius-card);
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -1492,8 +1519,10 @@ body.page-articles {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   gap: 18px;
-  padding: 18px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .article-date {
@@ -1789,7 +1818,7 @@ body.nav-menu-open {
 .card {
   background: var(--bg-card);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 14px;
+  border-radius: var(--radius-card);
   padding: 1.8rem;
   transition: all 0.35s ease;
   cursor: pointer;
@@ -1801,7 +1830,7 @@ body.nav-menu-open {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 14px;
+  border-radius: inherit;
   opacity: 0;
   background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(237, 146, 15, 0.1), transparent 40%);
   transition: opacity 0.35s ease;
@@ -1859,7 +1888,7 @@ body.nav-menu-open {
   padding: 2.5rem 2rem;
   background: rgba(237, 146, 15, 0.06);
   border: 1px solid rgba(237, 146, 15, 0.18);
-  border-radius: 16px;
+  border-radius: var(--radius-surface);
   text-align: center;
 }
 
@@ -1882,7 +1911,7 @@ body.nav-menu-open {
   background: var(--accent);
   color: #0d0d0d;
   font-weight: 600;
-  border-radius: 8px;
+  border-radius: 14px;
   text-decoration: none;
   font-size: 0.9rem;
   transition: all 0.3s ease;
@@ -2042,7 +2071,7 @@ body.nav-menu-open {
 
   .category-showcase-card {
     grid-column: auto;
-    border-radius: 24px;
+    border-radius: 62px;
   }
 
   .recent-feature-card {
@@ -2201,7 +2230,7 @@ body.nav-menu-open {
   .category-showcase-card {
     min-height: 132px;
     padding: 16px;
-    border-radius: 20px;
+    border-radius: 56px;
   }
 
   .showcase-cover-stack {
@@ -2214,7 +2243,7 @@ body.nav-menu-open {
   .showcase-cover-stack img {
     width: 52px;
     height: 66px;
-    border-radius: 9px;
+    border-radius: 35px;
   }
 
   .showcase-cover-stack img:nth-child(2) {
