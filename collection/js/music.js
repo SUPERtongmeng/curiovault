@@ -18,6 +18,9 @@
 
     var selectedIndex = 0;
     var audio = new Audio();
+    if (window.location.origin === 'https://supertongmeng.github.io') {
+      audio.crossOrigin = 'anonymous';
+    }
     var isPlaying = false;
     var isLyricsView = false;
     var isTranslationVisible = false;
@@ -27,15 +30,21 @@
     var hasScheduledCoverWarmup = false;
     var hoverCard = getMusicHoverCard();
     var playbackFrameId = 0;
+    var audioContext = null;
+    var audioAnalyser = null;
+    var frequencyData = null;
+    var highFrequencyExposure = 0;
 
     audio.addEventListener('ended', function () {
       stopPlaybackSync();
+      resetHighFrequencyExposure();
       playNextAfterEnded();
     });
 
     audio.addEventListener('pause', function () {
       isPlaying = false;
       stopPlaybackSync();
+      resetHighFrequencyExposure();
       updatePlaybackUi();
     });
 
@@ -499,11 +508,13 @@
     }
 
     function playAudio() {
+      ensureAudioAnalyser();
       isPlaying = true;
       updatePlaybackUi();
       audio.play().catch(function () {
         isPlaying = false;
         stopPlaybackSync();
+        resetHighFrequencyExposure();
         updatePlaybackUi();
       });
     }
@@ -526,7 +537,59 @@
       playbackFrameId = 0;
       if (!isPlaying || audio.paused || audio.ended) return;
       updatePlaybackUi();
+      updateHighFrequencyExposure();
       startPlaybackSync();
+    }
+
+    function ensureAudioAnalyser() {
+      if (audioAnalyser || prefersReducedMotion()) return;
+      var src = getAudioSrc(items[selectedIndex]);
+      if (!src || !canAnalyseAudio(src)) return;
+      var AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      try {
+        audioContext = audioContext || new AudioContext();
+        var source = audioContext.createMediaElementSource(audio);
+        audioAnalyser = audioContext.createAnalyser();
+        audioAnalyser.fftSize = 512;
+        audioAnalyser.smoothingTimeConstant = 0.56;
+        source.connect(audioAnalyser);
+        audioAnalyser.connect(audioContext.destination);
+        frequencyData = new Uint8Array(audioAnalyser.frequencyBinCount);
+        if (audioContext.state === 'suspended') audioContext.resume().catch(function () {});
+      } catch (error) {
+        audioAnalyser = null;
+        frequencyData = null;
+      }
+    }
+
+    function canAnalyseAudio(src) {
+      try {
+        var sourceOrigin = new URL(src, window.location.href).origin;
+        return sourceOrigin === window.location.origin || window.location.origin === 'https://supertongmeng.github.io';
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function updateHighFrequencyExposure() {
+      if (!audioAnalyser || !frequencyData || prefersReducedMotion()) return;
+      audioAnalyser.getByteFrequencyData(frequencyData);
+      var binHz = audioContext.sampleRate / audioAnalyser.fftSize;
+      var start = Math.max(1, Math.floor(4200 / binHz));
+      var end = Math.min(frequencyData.length, Math.ceil(12000 / binHz));
+      var sum = 0;
+      for (var i = start; i < end; i += 1) sum += frequencyData[i];
+      var energy = end > start ? sum / (end - start) / 255 : 0;
+      var target = Math.min(0.24, Math.max(0, (energy - 0.12) * 0.72));
+      var easing = target > highFrequencyExposure ? 0.48 : 0.1;
+      highFrequencyExposure += (target - highFrequencyExposure) * easing;
+      document.body.style.setProperty('--music-high-frequency-exposure', highFrequencyExposure.toFixed(3));
+    }
+
+    function resetHighFrequencyExposure() {
+      highFrequencyExposure = 0;
+      document.body.style.setProperty('--music-high-frequency-exposure', '0');
     }
 
     function updatePlaybackUi() {

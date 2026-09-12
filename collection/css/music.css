@@ -2,6 +2,7 @@ body.page-music {
   --accent: #ff2f7a;
   --accent-light: #ff72a6;
   --accent-dark: #b81757;
+  --music-high-frequency-exposure: 0;
 }
 
 /* Music — Apple Music‑style fluid background */
@@ -71,6 +72,17 @@ body.page-music {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.music-fluid-veil::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.9);
+  mix-blend-mode: soft-light;
+  opacity: var(--music-high-frequency-exposure);
+  pointer-events: none;
+  will-change: opacity;
+}
+
 @keyframes fluidSpinFwd {
   from { transform: rotate(0deg) scale(1.08); }
   to   { transform: rotate(360deg) scale(1.08); }
@@ -93,6 +105,10 @@ body.page-music {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  body.page-music {
+    --music-high-frequency-exposure: 0 !important;
+  }
+
   .fluid-orb,
   .music-player-content.is-switching .music-player-cover,
   .music-track,
