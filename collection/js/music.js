@@ -18,9 +18,6 @@
 
     var selectedIndex = 0;
     var audio = new Audio();
-    if (window.location.origin === 'https://supertongmeng.github.io') {
-      audio.crossOrigin = 'anonymous';
-    }
     var isPlaying = false;
     var isLyricsView = false;
     var isTranslationVisible = false;
@@ -30,21 +27,15 @@
     var hasScheduledCoverWarmup = false;
     var hoverCard = getMusicHoverCard();
     var playbackFrameId = 0;
-    var audioContext = null;
-    var audioAnalyser = null;
-    var frequencyData = null;
-    var highFrequencyExposure = 0;
 
     audio.addEventListener('ended', function () {
       stopPlaybackSync();
-      resetHighFrequencyExposure();
       playNextAfterEnded();
     });
 
     audio.addEventListener('pause', function () {
       isPlaying = false;
       stopPlaybackSync();
-      resetHighFrequencyExposure();
       updatePlaybackUi();
     });
 
@@ -508,13 +499,11 @@
     }
 
     function playAudio() {
-      ensureAudioAnalyser();
       isPlaying = true;
       updatePlaybackUi();
       audio.play().catch(function () {
         isPlaying = false;
         stopPlaybackSync();
-        resetHighFrequencyExposure();
         updatePlaybackUi();
       });
     }
@@ -537,59 +526,7 @@
       playbackFrameId = 0;
       if (!isPlaying || audio.paused || audio.ended) return;
       updatePlaybackUi();
-      updateHighFrequencyExposure();
       startPlaybackSync();
-    }
-
-    function ensureAudioAnalyser() {
-      if (audioAnalyser || prefersReducedMotion()) return;
-      var src = getAudioSrc(items[selectedIndex]);
-      if (!src || !canAnalyseAudio(src)) return;
-      var AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) return;
-      try {
-        audioContext = audioContext || new AudioContext();
-        var source = audioContext.createMediaElementSource(audio);
-        audioAnalyser = audioContext.createAnalyser();
-        audioAnalyser.fftSize = 512;
-        audioAnalyser.smoothingTimeConstant = 0.56;
-        source.connect(audioAnalyser);
-        audioAnalyser.connect(audioContext.destination);
-        frequencyData = new Uint8Array(audioAnalyser.frequencyBinCount);
-        if (audioContext.state === 'suspended') audioContext.resume().catch(function () {});
-      } catch (error) {
-        audioAnalyser = null;
-        frequencyData = null;
-      }
-    }
-
-    function canAnalyseAudio(src) {
-      try {
-        var sourceOrigin = new URL(src, window.location.href).origin;
-        return sourceOrigin === window.location.origin || window.location.origin === 'https://supertongmeng.github.io';
-      } catch (error) {
-        return false;
-      }
-    }
-
-    function updateHighFrequencyExposure() {
-      if (!audioAnalyser || !frequencyData || prefersReducedMotion()) return;
-      audioAnalyser.getByteFrequencyData(frequencyData);
-      var binHz = audioContext.sampleRate / audioAnalyser.fftSize;
-      var start = Math.max(1, Math.floor(4200 / binHz));
-      var end = Math.min(frequencyData.length, Math.ceil(12000 / binHz));
-      var sum = 0;
-      for (var i = start; i < end; i += 1) sum += frequencyData[i];
-      var energy = end > start ? sum / (end - start) / 255 : 0;
-      var target = Math.min(0.24, Math.max(0, (energy - 0.12) * 0.72));
-      var easing = target > highFrequencyExposure ? 0.48 : 0.1;
-      highFrequencyExposure += (target - highFrequencyExposure) * easing;
-      document.body.style.setProperty('--music-high-frequency-exposure', highFrequencyExposure.toFixed(3));
-    }
-
-    function resetHighFrequencyExposure() {
-      highFrequencyExposure = 0;
-      document.body.style.setProperty('--music-high-frequency-exposure', '0');
     }
 
     function updatePlaybackUi() {
@@ -1235,19 +1172,111 @@
     document.dispatchEvent(new CustomEvent('music:coverchange', { detail: item }));
   }
 
-  /* ── Album-cover fluid background (amll-style, double-buffer) ── */
+  /* ── Album-derived, heavily diffused moving texture ── */
   function initMusicFluidBackground() {
     var body = document.body;
     if (!body || !body.classList.contains('page-music')) return;
 
-    var layerA = document.getElementById('musicFluidLayerA');
-    var layerB = document.getElementById('musicFluidLayerB');
-    if (!layerA || !layerB) return;
+    var canvas = document.getElementById('musicFluidCanvas');
+    var context = canvas && canvas.getContext ? canvas.getContext('2d', { alpha: false }) : null;
+    if (!canvas || !context) return;
+    var textureCanvas = document.createElement('canvas');
+    var textureContext = textureCanvas.getContext('2d');
+    if (!textureContext) return;
 
-    var activeLayer = layerA;
     var requestId = 0;
+    var frameId = 0;
+    var lastFrameTime = 0;
+    var activeImage = null;
+    var outgoingImage = null;
+    var transitionStartedAt = 0;
+    var reducedMotion = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
-    /* ── Public API ── */
+    function resizeCanvas() {
+      var rect = canvas.getBoundingClientRect();
+      var renderScale = window.innerWidth < 720 ? 0.08 : 0.12;
+      var width = Math.max(1, Math.round(rect.width * renderScale));
+      var height = Math.max(1, Math.round(rect.height * renderScale));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+        textureCanvas.width = width;
+        textureCanvas.height = height;
+      }
+    }
+
+    function drawFluid(time) {
+      frameId = 0;
+      if (document.hidden) return;
+      if (!reducedMotion && time - lastFrameTime < 32) {
+        frameId = window.requestAnimationFrame(drawFluid);
+        return;
+      }
+      lastFrameTime = time;
+      resizeCanvas();
+      var width = canvas.width;
+      var height = canvas.height;
+      var seconds = reducedMotion ? 0 : time / 1000;
+      var transition = activeImage ? Math.min(1, (time - transitionStartedAt) / 1100) : 0;
+      var easedTransition = 0.5 - Math.cos(transition * Math.PI) / 2;
+
+      context.filter = 'none';
+      context.globalAlpha = 1;
+      context.fillStyle = '#17191f';
+      context.fillRect(0, 0, width, height);
+
+      if (outgoingImage && transition < 1) drawFluidImage(outgoingImage, 1 - easedTransition, seconds, 2.4);
+      if (activeImage) drawFluidImage(activeImage, outgoingImage ? easedTransition : 1, seconds, 0.2);
+      if (transition >= 1) outgoingImage = null;
+
+      context.filter = 'none';
+      context.globalAlpha = 1;
+      context.fillStyle = 'rgba(7, 9, 13, 0.2)';
+      context.fillRect(0, 0, width, height);
+      var vignette = context.createRadialGradient(width * 0.5, height * 0.45, 0, width * 0.5, height * 0.45, Math.max(width, height) * 0.78);
+      vignette.addColorStop(0.42, 'rgba(5, 7, 10, 0)');
+      vignette.addColorStop(1, 'rgba(5, 7, 10, 0.56)');
+      context.fillStyle = vignette;
+      context.fillRect(0, 0, width, height);
+
+      if (!reducedMotion) frameId = window.requestAnimationFrame(drawFluid);
+    }
+
+    function drawFluidImage(image, alpha, seconds, phase) {
+      var width = canvas.width;
+      var height = canvas.height;
+      var imageRatio = image.naturalWidth / image.naturalHeight;
+      var canvasRatio = width / height;
+      var baseWidth = imageRatio > canvasRatio ? height * imageRatio : width;
+      var baseHeight = imageRatio > canvasRatio ? height : width / imageRatio;
+      var scale = 1.2 + Math.sin(seconds * 0.2 + phase) * 0.055;
+      var drawWidth = baseWidth * scale;
+      var drawHeight = baseHeight * scale;
+      var driftX = Math.sin(seconds * 0.16 + phase) * width * 0.055;
+      var driftY = Math.cos(seconds * 0.13 + phase * 1.4) * height * 0.045;
+
+      textureContext.clearRect(0, 0, width, height);
+      textureContext.save();
+      textureContext.filter = 'blur(7px) contrast(0.62) saturate(1.85) brightness(0.82)';
+      textureContext.drawImage(image, (width - drawWidth) / 2 + driftX, (height - drawHeight) / 2 + driftY, drawWidth, drawHeight);
+      textureContext.restore();
+
+      context.save();
+      context.globalAlpha = Math.max(0, Math.min(1, alpha));
+      context.filter = 'blur(3px)';
+      var stripCount = 9;
+      var stripHeight = height / stripCount;
+      var overscan = width * 0.08;
+      for (var strip = 0; strip < stripCount; strip += 1) {
+        var sourceY = Math.floor(strip * stripHeight);
+        var sourceHeight = Math.ceil(stripHeight + 1);
+        var wave = reducedMotion ? 0 : Math.sin(seconds * 0.34 + strip * 0.82 + phase) * width * 0.055;
+        var lift = reducedMotion ? 0 : Math.cos(seconds * 0.27 + strip * 0.55 + phase) * height * 0.012;
+        context.drawImage(textureCanvas, 0, sourceY, width, sourceHeight, -overscan + wave, sourceY + lift, width + overscan * 2, sourceHeight + 1);
+      }
+      context.restore();
+    }
+
     window.updateMusicFluidPalette = function (item) {
       var src = getCoverSrc(item);
       requestId += 1;
@@ -1255,39 +1284,20 @@
 
       if (!src) { clearFluidOrbs(); return; }
 
-      /* Pick the inactive layer to receive new cover */
-      var incoming = (activeLayer === layerA) ? layerB : layerA;
-      var outgoing = activeLayer;
-
-      var img = new Image();
-      function applyCover() {
+      var image = new Image();
+      image.decoding = 'async';
+      image.onload = function () {
         if (current !== requestId) return;
-        /* Set new background on incoming orbs */
-        var orbs = incoming.querySelectorAll('.fluid-orb');
-        orbs.forEach(function (orb) {
-          orb.style.backgroundImage = cssImageUrl(src);
-        });
-        incoming.offsetHeight;
-        orbs.forEach(function (orb) { orb.classList.add('loaded'); });
-
-        /* Fade out old layer */
-        var oldOrbs = outgoing.querySelectorAll('.fluid-orb');
-        oldOrbs.forEach(function (orb) { orb.classList.remove('loaded'); });
-
-        /* Swap active */
-        activeLayer = incoming;
-      }
-      img.onload = applyCover;
-      img.onerror = function () {
-        if (current === requestId) clearFluidOrbs();
+        outgoingImage = activeImage;
+        activeImage = image;
+        transitionStartedAt = performance.now();
+        if (!frameId) frameId = window.requestAnimationFrame(drawFluid);
       };
-      img.src = src;
-      if (img.complete) applyCover();
+      image.src = src;
 
-      /* Extract dominant colour for page background */
       extractCoverPalette(src).then(function (palette) {
         if (current !== requestId) return;
-        var base = palette.base || tintMusicColor(palette.colors[0]);
+        var base = palette.colors[0].map(function (channel) { return Math.round(channel * 0.34); });
         body.style.setProperty('--music-fluid-base', rgbString(base));
       }).catch(function () {});
     };
@@ -1295,15 +1305,17 @@
     document.addEventListener('music:coverchange', function (event) {
       window.updateMusicFluidPalette(event.detail || {});
     });
+
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && !frameId) frameId = window.requestAnimationFrame(drawFluid);
+    });
+    window.addEventListener('resize', resizeCanvas, { passive: true });
+    frameId = window.requestAnimationFrame(drawFluid);
   }
 
   function clearFluidOrbs() {
-    document.querySelectorAll('.fluid-orb').forEach(function (orb) {
-      orb.style.backgroundImage = '';
-      orb.classList.remove('loaded');
-    });
     var body = document.body;
-    if (body) body.style.setProperty('--music-fluid-base', '#f8f3ff');
+    if (body) body.style.setProperty('--music-fluid-base', '#17191f');
   }
 
   /* ── Cover palette extraction (reused for base colour) ── */
@@ -1374,9 +1386,6 @@
   }
   function rgbString(rgb) { return 'rgb(' + rgb.join(', ') + ')'; }
 
-  function cssImageUrl(src) {
-    return 'url("' + String(src).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '")';
-  }
   initMusicFluidBackground();
 
   function iconPlay() {
